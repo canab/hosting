@@ -1,4 +1,3 @@
-/// <reference path="Core.ts" />
 var __extends = this.__extends || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -74,18 +73,17 @@ var fl;
     })(PIXI.DisplayObject);
     fl.FlashObject = FlashObject;
 })(fl || (fl = {}));
-/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Animation = (function () {
         function Animation(target) {
-            this.ticksPerFrame = 1;
+            this.ticksPerFrame = Animation.defaultTicksPerFrame;
             this.isActive = false;
             this._target = target;
         }
         Animation.prototype.playTo = function (endFrame) {
             this._looping = false;
-            this._endFrame = Math.min(Math.max(endFrame, 0), this._target.totalFrames - 1);
+            this._endFrame = fl.clampRange(endFrame, 0, this._target.totalFrames - 1);
             this._step = this._endFrame > this._target.currentFrame ? 1 : -1;
             this.isActive = true;
         };
@@ -148,11 +146,11 @@ var fl;
         Animation.prototype.onComplete = function (handler) {
             this._completeHandler = handler;
         };
+        Animation.defaultTicksPerFrame = 1;
         return Animation;
     })();
     fl.Animation = Animation;
 })(fl || (fl = {}));
-/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Resource = (function () {
@@ -160,6 +158,9 @@ var fl;
             this._id = id;
         }
         Resource.prototype.createInstance = function () {
+            throw new Error("Not implemented");
+        };
+        Resource.prototype.dispose = function () {
             throw new Error("Not implemented");
         };
         Object.defineProperty(Resource.prototype, "id", {
@@ -178,9 +179,21 @@ var fl;
             this.name = name;
         }
         Bundle.load = function (bundleName, onComplete) {
-            var bundle = new Bundle(bundleName);
+            console.log("Loading bundle: " + bundleName);
+            var bundle = Bundle._bundles[bundleName];
+            if (bundle)
+                throw new Error("Bundle is already loaded: " + bundleName);
+            bundle = new Bundle(bundleName);
             Bundle._bundles[bundleName] = bundle;
             bundle.load(onComplete);
+        };
+        Bundle.unload = function (bundleName) {
+            console.log("Unoading bundle: " + bundleName);
+            var bundle = Bundle._bundles[bundleName];
+            if (!bundle)
+                throw new Error("Bundle is not loaded: " + bundleName);
+            Bundle._bundles[bundleName] = null;
+            bundle.unload();
         };
         Bundle.getResource = function (resourceId) {
             var bundleId = resourceId.substr(0, resourceId.indexOf('/'));
@@ -208,11 +221,17 @@ var fl;
             this.completeHandler = onComplete;
             this.loadTexture();
         };
+        Bundle.prototype.unload = function () {
+            var _this = this;
+            Object.keys(this.resources).forEach(function (key) { return _this.resources[key].dispose(); });
+            this.texture.destroy(true);
+            this.texture = null;
+        };
         Bundle.prototype.loadTexture = function () {
             var _this = this;
             var url = this.getUrl('texture.png');
             var loader = new PIXI.ImageLoader(url);
-            console.log('loading: ' + url);
+            console.log('Loading: ' + url);
             loader.on('loaded', function () {
                 _this.texture = loader.texture;
                 _this.loadFrames();
@@ -223,7 +242,7 @@ var fl;
             var _this = this;
             var url = this.getUrl('texture.json');
             var loader = new PIXI.JsonLoader(url);
-            console.log('loading: ' + url);
+            console.log('Loading: ' + url);
             loader.on('loaded', function () {
                 var json = loader['json'];
                 for (var i = 0; i < json.length; i++) {
@@ -241,7 +260,7 @@ var fl;
             var _this = this;
             var url = this.getUrl('timeline.json');
             var loader = new PIXI.JsonLoader(url);
-            console.log('loading: ' + url);
+            console.log('Loading: ' + url);
             loader.on('loaded', function () {
                 var json = loader['json'];
                 for (var i = 0; i < json.length; i++) {
@@ -265,7 +284,6 @@ var fl;
     })();
     fl.Bundle = Bundle;
 })(fl || (fl = {}));
-/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Container = (function (_super) {
@@ -278,7 +296,6 @@ var fl;
             this.color = { r: 1, g: 1, b: 1, a: 1 };
             this._currentFrame = 0;
             this._totalFrames = 1;
-            //endregion
             this.globalColor = {};
         }
         Object.defineProperty(Container.prototype, "totalFrames", {
@@ -403,18 +420,23 @@ var fl;
     })(PIXI.DisplayObjectContainer);
     fl.Container = Container;
 })(fl || (fl = {}));
-/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
+    (function (PlayType) {
+        PlayType[PlayType["LOOP"] = 0] = "LOOP";
+        PlayType[PlayType["ONCE"] = 1] = "ONCE";
+        PlayType[PlayType["NONE"] = 2] = "NONE";
+    })(fl.PlayType || (fl.PlayType = {}));
+    var PlayType = fl.PlayType;
     var Clip = (function (_super) {
         __extends(Clip, _super);
         function Clip(resource) {
             _super.call(this);
+            this.nestedPlayingType = 0 /* LOOP */;
             this._instances = [];
             this._resource = resource;
             this._totalFrames = resource.frames.length;
             this.labels = resource.labels;
-            this.nestedAnimationEnabled = true;
             this.constructInstances();
             this.handleFrameChange();
         }
@@ -454,8 +476,12 @@ var fl;
                 var instance = frame.instances[instanceIndex];
                 if (item.timelineInstanceId == instance.id) {
                     instance.applyPropertiesTo(item);
-                    if (this.nestedAnimationEnabled && item.totalFrames > 1)
-                        item.stepForward();
+                    if (item.totalFrames > 1) {
+                        if (this.nestedPlayingType == 0 /* LOOP */)
+                            item.stepForward();
+                        else if (this.nestedPlayingType == 1 /* ONCE */)
+                            item.gotoNextFrame();
+                    }
                     instanceIndex++;
                     itemIndex++;
                 }
@@ -528,7 +554,6 @@ var fl;
     })(fl.Container);
     fl.Clip = Clip;
 })(fl || (fl = {}));
-/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var ClipResource = (function (_super) {
@@ -599,6 +624,12 @@ var fl;
             var resourceNum = this.instances[instanceId].resourceNum;
             return this.resources[resourceNum];
         };
+        ClipResource.prototype.dispose = function () {
+            this.resources = null;
+            this.instances = null;
+            this.frames = null;
+            this.labels = null;
+        };
         return ClipResource;
     })(fl.Resource);
     fl.ClipResource = ClipResource;
@@ -647,12 +678,10 @@ var fl;
         return InstanceData;
     })();
 })(fl || (fl = {}));
-/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Sprite = (function (_super) {
         __extends(Sprite, _super);
-        //endregion
         function Sprite(resource) {
             _super.call(this, null);
             this.timelineInstanceId = -1;
@@ -736,7 +765,6 @@ var fl;
     })(PIXI.Sprite);
     fl.Sprite = Sprite;
 })(fl || (fl = {}));
-/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var SpriteFrame = (function () {
@@ -772,21 +800,25 @@ var fl;
         SpriteResource.prototype.createInstance = function () {
             return new fl.Sprite(this);
         };
+        SpriteResource.prototype.dispose = function () {
+            this.texture.destroy(false);
+            this.texture = null;
+            this.frames = null;
+            this.labels = null;
+        };
         return SpriteResource;
     })(fl.Resource);
     fl.SpriteResource = SpriteResource;
 })(fl || (fl = {}));
-/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Button = (function () {
         function Button(target, action) {
             var _this = this;
+            this._enabled = true;
             fl.assertPresent(target, "target");
             this.content = target;
             this.onRelease = action;
-            this.content.interactive = true;
-            this.content.buttonMode = true;
             this.content.mouseover = function () {
                 _this.setDownState();
             };
@@ -802,7 +834,25 @@ var fl;
                 if (_this.onRelease)
                     _this.onRelease(_this);
             };
+            this.refreshEnabledState();
         }
+        Object.defineProperty(Button.prototype, "enabled", {
+            get: function () {
+                return this._enabled;
+            },
+            set: function (value) {
+                if (this._enabled != value) {
+                    this._enabled = value;
+                    this.refreshEnabledState();
+                }
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Button.prototype.refreshEnabledState = function () {
+            this.content.interactive = this._enabled;
+            this.content.buttonMode = this._enabled;
+        };
         Button.prototype.setDownState = function () {
             this.content.currentFrame = 1;
         };
@@ -813,16 +863,6 @@ var fl;
     })();
     fl.Button = Button;
 })(fl || (fl = {}));
-/// <reference path="../lib/pixi.d.ts" />
-/// <reference path="FlashObject.ts" />
-/// <reference path="Animation.ts" />
-/// <reference path="Bundle.ts" />
-/// <reference path="Container.ts" />
-/// <reference path="Clip.ts" />
-/// <reference path="ClipResource.ts" />
-/// <reference path="Sprite.ts" />
-/// <reference path="SpriteResource.ts" />
-/// <reference path="Button.ts" />
 var fl;
 (function (fl) {
     applyMixins(fl.Container, fl.FlashObject);
@@ -877,11 +917,6 @@ var dressup;
     var Config = (function () {
         function Config() {
         }
-        /**
-         * Bindings for link buttons.
-         * Each screen is recursively scanned for links.
-         * If object's name is present in this map, button with navigation action is created
-         * */
         Config.links = {
             'preloaderLink': 'http://girlieroom.com/?EDs309',
             'btnLogo': 'http://girlieroom.com/?EDs309',
@@ -889,11 +924,7 @@ var dressup;
             'btnFreeGamesForYourSite': 'http://girlieroom.com/freegames/page1/?EDs309',
             'btnFB': 'http://facebook.com/EmilyDiary',
         };
-        // Generated code!
-        // generated from config.xml
-        // config.xml.rb
         Config.parts = {
-            //{BEGIN}
             'btn_m1_opt1': { 'path': ['model_1/opt_1'], 'exclude': [], 'allowHide': false },
             'btn_m1_opt2': { 'path': ['model_1/opt_2'], 'exclude': ['model_1/opt_3', 'model_1/opt_4'], 'allowHide': true },
             'btn_m1_opt3': { 'path': ['model_1/opt_3'], 'exclude': ['model_1/opt_2'], 'allowHide': true },
@@ -946,9 +977,10 @@ var dressup;
 })(dressup || (dressup = {}));
 var dressup;
 (function (dressup) {
-    /** Base class for all screens */
     var AppScreen = (function () {
-        function AppScreen(content) {
+        function AppScreen(name, content) {
+            this.name = "AppScreen";
+            this.name = name;
             this.content = content;
             this.configureContent(content);
         }
@@ -956,15 +988,11 @@ var dressup;
             var _this = this;
             content.instances.forEach(function (it) {
                 var url;
-                /** check whether object is link button */
                 if (url = dressup.Config.links[it.name]) {
                     new fl.Button(it, function () { return window.open(url, '_blank'); });
                     return;
                 }
-                /** autoplay objects without name */
                 if (!it.name && it.totalFrames > 1) {
-                    console.log(it);
-                    it.animation.ticksPerFrame = 2;
                     it.animation.play();
                     return;
                 }
@@ -978,11 +1006,29 @@ var dressup;
 })(dressup || (dressup = {}));
 var dressup;
 (function (dressup) {
+    var IntroScreen = (function (_super) {
+        __extends(IntroScreen, _super);
+        function IntroScreen() {
+            _super.call(this, 'IntroScreen', fl.Bundle.createClip('intro/McIntroScreen'));
+            var button = new fl.Button(this.content.getByName('btnPlay'), function () {
+                button.enabled = false;
+                dressup.App.loadScene();
+            });
+            var intro = this.content.getByName('mcIntroAnimation');
+            intro.nestedPlayingType = 1 /* ONCE */;
+            intro.animation.playToEnd();
+        }
+        return IntroScreen;
+    })(dressup.AppScreen);
+    dressup.IntroScreen = IntroScreen;
+})(dressup || (dressup = {}));
+var dressup;
+(function (dressup) {
     var SceneScreen = (function (_super) {
         __extends(SceneScreen, _super);
         function SceneScreen() {
             var _this = this;
-            _super.call(this, fl.Bundle.createClip('scene/McScene'));
+            _super.call(this, 'SceneScreen', fl.Bundle.createClip('scene/McScene'));
             this._backButton = this.createBackButton();
             this._models = this.content.getAllByPrefix(SceneScreen.MODEL_PREFIX).map(function (it) { return _this.processModel(it); });
             this._partButtons = this.content.getAllByPrefix(SceneScreen.PART_BTN_PREFIX).map(function (it) { return new fl.Button(it, function (btn) { return _this.onPartButtonClick(btn); }); });
@@ -1045,13 +1091,10 @@ var dressup;
             else
                 throw new Error("Config not found: " + optionId);
         };
-        //
-        // ControlPanel
-        //
         SceneScreen.prototype.initControlPanel = function () {
             var _this = this;
             var content = this.content['mcControlPanel'];
-            content.nestedAnimationEnabled = false;
+            content.nestedPlayingType = 2 /* NONE */;
             new fl.Button(content["btnBack"], function () {
                 _this.setControlsVisible(true);
                 content.currentFrame = 0;
@@ -1092,47 +1135,62 @@ var dressup;
     })(dressup.AppScreen);
     dressup.SceneScreen = SceneScreen;
 })(dressup || (dressup = {}));
-/// <reference path="fl/Core.ts" />
-/// <reference path="Config.ts" />
-/// <reference path="AppScreen.ts" />
-/// <reference path="SceneScreen.ts" />
 var dressup;
 (function (dressup) {
-    /** Application facade */
     var App = (function () {
         function App() {
         }
-        App.initialize = function () {
+        App.initialize = function (placement) {
+            fl.assertPresent(placement, "placement:HTMLElement");
+            fl.Animation.defaultTicksPerFrame = 2;
             App.initStage();
-            fl.Bundle.load('scene', App.onBundleLoaded);
+            App.loadIntro();
+            placement.appendChild(App.renderer.view);
             requestAnimFrame(App.animate);
         };
         App.initStage = function () {
             App.stage = new PIXI.Stage(0x003030);
             App.renderer = dressup.FORCE_USE_CANVAS ? new PIXI.CanvasRenderer(App.WIDTH, App.HEIGHT) : PIXI.autoDetectRenderer(App.WIDTH, App.HEIGHT);
             App.canvas = App.renderer.view;
-            document.body.appendChild(App.renderer.view);
         };
-        App.onBundleLoaded = function () {
-            App.changeScreen(new dressup.SceneScreen());
+        App.loadIntro = function () {
+            fl.Bundle.load('intro', function () {
+                App.changeScreen(new dressup.IntroScreen());
+            });
+        };
+        App.loadScene = function () {
+            fl.Bundle.load('scene', function () {
+                fl.Bundle.unload('intro');
+                App.changeScreen(new dressup.SceneScreen());
+            });
         };
         App.animate = function () {
-            requestAnimFrame(App.animate);
-            App.renderer.render(App.stage);
+            try {
+                App.renderer.render(App.stage);
+                requestAnimFrame(App.animate);
+            }
+            catch (e) {
+                console.error("Stage error: probably some resources are unloaded but still present on the stage");
+                throw e;
+            }
         };
         App.changeScreen = function (screen) {
+            console.log("App.changeScreen: " + screen.name);
             if (App._screen)
-                App.stage.removeChild(screen.content);
+                App.stage.removeChild(App._screen.content);
             App._screen = screen;
             if (App._screen)
-                App.stage.addChild(screen.content);
+                App.stage.addChild(App._screen.content);
         };
         App.saveScreenshot = function () {
             App.renderer.render(App.stage);
-            var link = document.createElement('a');
-            link['download'] = "screenshot.png";
-            link.href = App.canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-            link.click();
+            var anchor = document.createElement('a');
+            anchor.textContent = "download screenshot";
+            anchor['download'] = "screenshot.png";
+            anchor.href = App.canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+            var event = document.createEvent("MouseEvent");
+            event.initMouseEvent("click", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+            anchor.dispatchEvent(event);
         };
         App.WIDTH = 760;
         App.HEIGHT = 610;
@@ -1140,13 +1198,12 @@ var dressup;
     })();
     dressup.App = App;
 })(dressup || (dressup = {}));
-/// <reference path="App.ts" />
-/** This class is an entry point for the application */
 var dressup;
 (function (dressup) {
     dressup.FORCE_USE_CANVAS = false;
-    /** uncomment for verbose logging */
-    //fl.Bundle.VERBOSE_LOG = true;
-    window.onload = dressup.App.initialize;
+    window.onload = function () {
+        var placement = document.getElementById('game');
+        dressup.App.initialize(placement);
+    };
 })(dressup || (dressup = {}));
 //# sourceMappingURL=dressup.js.map
