@@ -179,7 +179,7 @@ var fl;
             this.name = name;
         }
         Bundle.load = function (bundleName, onComplete) {
-            console.log("Loading bundle: " + bundleName);
+            console.log("Bundle.load: " + bundleName);
             var bundle = Bundle._bundles[bundleName];
             if (bundle)
                 throw new Error("Bundle is already loaded: " + bundleName);
@@ -188,7 +188,7 @@ var fl;
             bundle.load(onComplete);
         };
         Bundle.unload = function (bundleName) {
-            console.log("Unoading bundle: " + bundleName);
+            console.log("Bundle.unload: " + bundleName);
             var bundle = Bundle._bundles[bundleName];
             if (!bundle)
                 throw new Error("Bundle is not loaded: " + bundleName);
@@ -231,7 +231,7 @@ var fl;
             var _this = this;
             var url = this.getUrl('texture.png');
             var loader = new PIXI.ImageLoader(url);
-            console.log('Loading: ' + url);
+            this.verboseLog('Loading: ' + url);
             loader.on('loaded', function () {
                 _this.texture = loader.texture;
                 _this.loadFrames();
@@ -242,15 +242,14 @@ var fl;
             var _this = this;
             var url = this.getUrl('texture.json');
             var loader = new PIXI.JsonLoader(url);
-            console.log('Loading: ' + url);
+            this.verboseLog('Loading: ' + url);
             loader.on('loaded', function () {
                 var json = loader['json'];
                 for (var i = 0; i < json.length; i++) {
                     var item = json[i];
                     var id = item['path'];
                     _this.resources[id] = fl.SpriteResource.fromJson(item, _this.texture);
-                    if (Bundle.VERBOSE_LOG)
-                        console.log(id);
+                    _this.verboseLog(id);
                 }
                 _this.loadTimeline();
             });
@@ -260,20 +259,23 @@ var fl;
             var _this = this;
             var url = this.getUrl('timeline.json');
             var loader = new PIXI.JsonLoader(url);
-            console.log('Loading: ' + url);
+            this.verboseLog('Loading: ' + url);
             loader.on('loaded', function () {
                 var json = loader['json'];
                 for (var i = 0; i < json.length; i++) {
                     var item = json[i];
                     var id = item.path;
                     _this.resources[id] = fl.ClipResource.fromJson(item);
-                    if (Bundle.VERBOSE_LOG)
-                        console.log(id);
+                    _this.verboseLog(id);
                 }
                 if (_this.completeHandler != null)
                     _this.completeHandler();
             });
             loader.load();
+        };
+        Bundle.prototype.verboseLog = function (message) {
+            if (Bundle.VERBOSE_LOG)
+                console.log(message);
         };
         Bundle.prototype.getUrl = function (assetName) {
             return "assets/" + this.name + "/" + assetName;
@@ -454,8 +456,6 @@ var fl;
                 }
                 instance.name = instName;
                 this._instances[i] = instance;
-                if (instName && !this[instName])
-                    this[instName] = instance;
             }
         };
         Clip.prototype.handleFrameChange = function () {
@@ -534,7 +534,7 @@ var fl;
         Clip.prototype.toString = function () {
             return 'Clip[' + this._resource.id + ']';
         };
-        Clip.prototype.getInstance = function (name) {
+        Clip.prototype.getElement = function (name) {
             var n = this._instances.length;
             for (var i = 0; i < n; i++) {
                 var inst = this._instances[i];
@@ -906,23 +906,22 @@ var fl;
     })();
     fl.Internal = Internal;
 })(fl || (fl = {}));
-var dressup;
-(function (dressup) {
+var dressup_game;
+(function (dressup_game) {
     var PartConfig = (function () {
         function PartConfig() {
         }
         return PartConfig;
     })();
-    dressup.PartConfig = PartConfig;
+    dressup_game.PartConfig = PartConfig;
     var Config = (function () {
         function Config() {
         }
         Config.links = {
-            'preloaderLink': 'http://girlieroom.com/?EDs309',
-            'btnLogo': 'http://girlieroom.com/?EDs309',
-            'btnMoreGames': 'http://girlieroom.com/?EDs309',
-            'btnFreeGamesForYourSite': 'http://girlieroom.com/freegames/page1/?EDs309',
-            'btnFB': 'http://facebook.com/EmilyDiary',
+            'small_logo': 'http://girlieroom.com/?EDs309',
+            'btn_more_seasons': 'http://girlieroom.com/?EDs309',
+            'btn_free_games': 'http://girlieroom.com/freegames/page1/?EDs309',
+            'btn_fb': 'http://facebook.com/EmilyDiary',
         };
         Config.parts = {
             'btn_m1_opt1': { 'path': ['model_1/opt_1'], 'exclude': [], 'allowHide': false },
@@ -973,10 +972,10 @@ var dressup;
         };
         return Config;
     })();
-    dressup.Config = Config;
-})(dressup || (dressup = {}));
-var dressup;
-(function (dressup) {
+    dressup_game.Config = Config;
+})(dressup_game || (dressup_game = {}));
+var dressup_game;
+(function (dressup_game) {
     var AppScreen = (function () {
         function AppScreen(name, content) {
             this.name = "AppScreen";
@@ -984,11 +983,14 @@ var dressup;
             this.content = content;
             this.configureContent(content);
         }
+        AppScreen.prototype.getElement = function (name) {
+            return this.content.getElement(name);
+        };
         AppScreen.prototype.configureContent = function (content) {
             var _this = this;
             content.instances.forEach(function (it) {
                 var url;
-                if (url = dressup.Config.links[it.name]) {
+                if (url = dressup_game.Config.links[it.name]) {
                     new fl.Button(it, function () { return window.open(url, '_blank'); });
                     return;
                 }
@@ -1002,42 +1004,54 @@ var dressup;
         };
         return AppScreen;
     })();
-    dressup.AppScreen = AppScreen;
-})(dressup || (dressup = {}));
-var dressup;
-(function (dressup) {
+    dressup_game.AppScreen = AppScreen;
+})(dressup_game || (dressup_game = {}));
+var dressup_game;
+(function (dressup_game) {
     var IntroScreen = (function (_super) {
         __extends(IntroScreen, _super);
         function IntroScreen() {
-            _super.call(this, 'IntroScreen', fl.Bundle.createClip('intro/McIntroScreen'));
-            var button = new fl.Button(this.content.getByName('btnPlay'), function () {
-                button.enabled = false;
-                dressup.App.loadScene();
+            _super.call(this, 'IntroScreen', fl.Bundle.createClip('intro/intro_screen'));
+            this.playButton = new fl.Button(this.getElement('btn_play'), function () {
+                fl.Bundle.unload('intro');
+                dressup_game.App.changeScreen(new dressup_game.SceneScreen());
             });
-            var intro = this.content.getByName('mcIntroAnimation');
+            this.loadingClip = this.getElement('loading');
+            var intro = this.getElement('intro_anim');
             intro.nestedPlayingType = 1 /* ONCE */;
             intro.animation.playToEnd();
+            this.loadSceneBundle();
         }
+        IntroScreen.prototype.loadSceneBundle = function () {
+            var _this = this;
+            this.playButton.content.visible = false;
+            this.loadingClip.animation.play();
+            fl.Bundle.load('scene', function () {
+                _this.loadingClip.animation.stop();
+                _this.loadingClip.visible = false;
+                _this.playButton.content.visible = true;
+            });
+        };
         return IntroScreen;
-    })(dressup.AppScreen);
-    dressup.IntroScreen = IntroScreen;
-})(dressup || (dressup = {}));
-var dressup;
-(function (dressup) {
+    })(dressup_game.AppScreen);
+    dressup_game.IntroScreen = IntroScreen;
+})(dressup_game || (dressup_game = {}));
+var dressup_game;
+(function (dressup_game) {
     var SceneScreen = (function (_super) {
         __extends(SceneScreen, _super);
         function SceneScreen() {
             var _this = this;
-            _super.call(this, 'SceneScreen', fl.Bundle.createClip('scene/McScene'));
+            _super.call(this, 'SceneScreen', fl.Bundle.createClip('scene/scene_screen'));
             this._backButton = this.createBackButton();
             this._models = this.content.getAllByPrefix(SceneScreen.MODEL_PREFIX).map(function (it) { return _this.processModel(it); });
             this._partButtons = this.content.getAllByPrefix(SceneScreen.PART_BTN_PREFIX).map(function (it) { return new fl.Button(it, function (btn) { return _this.onPartButtonClick(btn); }); });
             this._backgrounds = this.content.getAllByPrefix(SceneScreen.BG_PREFIX);
-            this.initControlPanel();
+            this._controls = this.initControlPanel();
         }
         SceneScreen.prototype.createBackButton = function () {
             var _this = this;
-            return new fl.Button(this.content['btnBackground'], function () {
+            return new fl.Button(this.content.getElement('btnBackground'), function () {
                 _this._backgrounds.forEach(function (it) { return it.stepForward(); });
             });
         };
@@ -1053,12 +1067,12 @@ var dressup;
                 part.buttonMode = true;
                 part.mouseup = function (it) { return part.visible = false; };
             }
-            part.visible = part.gotoLabel(SceneScreen.DEFAULT_FRAME_LABEL);
+            part.visible = part.gotoLabel('default_frame');
         };
         SceneScreen.prototype.onPartButtonClick = function (btn) {
             var _this = this;
             var btnName = btn.content.name;
-            var btnConfig = dressup.Config.parts[btnName];
+            var btnConfig = dressup_game.Config.parts[btnName];
             if (!btnConfig)
                 throw new Error("Config not found for button: " + btnName);
             btnConfig.path.forEach(function (it) { return _this.toggleModelPart(it); });
@@ -1085,7 +1099,7 @@ var dressup;
             var modelNum = model.name.replace(/\D+/, "");
             var optionNum = part.name.replace(/\D+/, "");
             var optionId = "btn_m" + modelNum + "_opt" + optionNum;
-            var config = dressup.Config.parts[optionId];
+            var config = dressup_game.Config.parts[optionId];
             if (config)
                 return config;
             else
@@ -1093,28 +1107,22 @@ var dressup;
         };
         SceneScreen.prototype.initControlPanel = function () {
             var _this = this;
-            var content = this.content['mcControlPanel'];
-            content.nestedPlayingType = 2 /* NONE */;
-            new fl.Button(content["btnBack"], function () {
-                _this.setControlsVisible(true);
-                content.currentFrame = 0;
-            });
-            new fl.Button(content["btnReset"], function () {
+            var controls = this.content.getElement('controls');
+            controls.nestedPlayingType = 2 /* NONE */;
+            new fl.Button(controls.getElement('btn_reset'), function () {
                 _this.resetModels();
             });
-            new fl.Button(content["btnPhoto"], function () {
+            new fl.Button(controls.getElement('btn_photo'), function () {
                 _this.setControlsVisible(false);
-                content.currentFrame = 1;
+                dressup_game.App.shareOnFacebook();
+                _this.setControlsVisible(true);
             });
-            new fl.Button(content["btnSave"], function () {
-                content.currentFrame = 2;
-                dressup.App.saveScreenshot();
-                content.currentFrame = 1;
-            });
+            return controls;
         };
         SceneScreen.prototype.setControlsVisible = function (value) {
             this._partButtons.forEach(function (it) { return it.content.visible = value; });
             this._backButton.content.visible = value;
+            this._controls.currentFrame = value ? 0 : 1;
         };
         SceneScreen.prototype.resetModels = function () {
             var _this = this;
@@ -1126,43 +1134,43 @@ var dressup;
                 });
             });
         };
-        SceneScreen.DEFAULT_FRAME_LABEL = "default_frame";
         SceneScreen.MODEL_PREFIX = "model";
         SceneScreen.PART_PREFIX = "opt";
-        SceneScreen.PART_BTN_PREFIX = "btn_";
+        SceneScreen.PART_BTN_PREFIX = "btn_m";
         SceneScreen.BG_PREFIX = "back";
         return SceneScreen;
-    })(dressup.AppScreen);
-    dressup.SceneScreen = SceneScreen;
-})(dressup || (dressup = {}));
-var dressup;
-(function (dressup) {
+    })(dressup_game.AppScreen);
+    dressup_game.SceneScreen = SceneScreen;
+})(dressup_game || (dressup_game = {}));
+var dressup_game;
+(function (dressup_game) {
+    dressup_game.APP_WIDTH = 760;
+    dressup_game.APP_HEIGHT = 610;
+    dressup_game.STAGE_COLOR = 0xffffff;
+    dressup_game.FORCE_USE_CANVAS = false;
+    function initialize(containerId) {
+        var container = document.getElementById(containerId);
+        if (!container)
+            throw new Error("Element not found: id=\"" + containerId + "\"");
+        App.initialize();
+        container.appendChild(App.canvas);
+    }
+    dressup_game.initialize = initialize;
     var App = (function () {
         function App() {
         }
-        App.initialize = function (placement) {
-            fl.assertPresent(placement, "placement:HTMLElement");
+        App.initialize = function () {
             fl.Animation.defaultTicksPerFrame = 2;
             App.initStage();
             App.loadIntro();
-            placement.appendChild(App.renderer.view);
             requestAnimFrame(App.animate);
         };
         App.initStage = function () {
-            App.stage = new PIXI.Stage(0x003030);
-            App.renderer = dressup.FORCE_USE_CANVAS ? new PIXI.CanvasRenderer(App.WIDTH, App.HEIGHT) : PIXI.autoDetectRenderer(App.WIDTH, App.HEIGHT);
-            App.canvas = App.renderer.view;
+            App.stage = new PIXI.Stage(dressup_game.STAGE_COLOR);
+            App.renderer = dressup_game.FORCE_USE_CANVAS ? new PIXI.CanvasRenderer(dressup_game.APP_WIDTH, dressup_game.APP_HEIGHT) : PIXI.autoDetectRenderer(dressup_game.APP_WIDTH, dressup_game.APP_HEIGHT);
         };
         App.loadIntro = function () {
-            fl.Bundle.load('intro', function () {
-                App.changeScreen(new dressup.IntroScreen());
-            });
-        };
-        App.loadScene = function () {
-            fl.Bundle.load('scene', function () {
-                fl.Bundle.unload('intro');
-                App.changeScreen(new dressup.SceneScreen());
-            });
+            fl.Bundle.load('intro', function () { return App.changeScreen(new dressup_game.IntroScreen()); });
         };
         App.animate = function () {
             try {
@@ -1182,28 +1190,17 @@ var dressup;
             if (App._screen)
                 App.stage.addChild(App._screen.content);
         };
-        App.saveScreenshot = function () {
-            App.renderer.render(App.stage);
-            var anchor = document.createElement('a');
-            anchor.textContent = "download screenshot";
-            anchor['download'] = "screenshot.png";
-            anchor.href = App.canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-            var event = document.createEvent("MouseEvent");
-            event.initMouseEvent("click", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-            anchor.dispatchEvent(event);
+        App.shareOnFacebook = function () {
         };
-        App.WIDTH = 760;
-        App.HEIGHT = 610;
+        Object.defineProperty(App, "canvas", {
+            get: function () {
+                return App.renderer.view;
+            },
+            enumerable: true,
+            configurable: true
+        });
         return App;
     })();
-    dressup.App = App;
-})(dressup || (dressup = {}));
-var dressup;
-(function (dressup) {
-    dressup.FORCE_USE_CANVAS = false;
-    window.onload = function () {
-        var placement = document.getElementById('game');
-        dressup.App.initialize(placement);
-    };
-})(dressup || (dressup = {}));
+    dressup_game.App = App;
+})(dressup_game || (dressup_game = {}));
 //# sourceMappingURL=dressup.js.map
