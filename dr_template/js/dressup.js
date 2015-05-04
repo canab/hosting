@@ -173,6 +173,9 @@ var fl;
         return Resource;
     })();
     fl.Resource = Resource;
+})(fl || (fl = {}));
+var fl;
+(function (fl) {
     var Bundle = (function () {
         function Bundle(name) {
             this.resources = {};
@@ -229,49 +232,43 @@ var fl;
         };
         Bundle.prototype.loadTexture = function () {
             var _this = this;
-            var url = this.getUrl('texture.png');
+            var url = this.getUrl('bundle.png');
             var loader = new PIXI.ImageLoader(url);
             this.verboseLog('Loading: ' + url);
             loader.on('loaded', function () {
                 _this.texture = loader.texture;
-                _this.loadFrames();
+                _this.loadResources();
             });
             loader.load();
         };
-        Bundle.prototype.loadFrames = function () {
+        Bundle.prototype.loadResources = function () {
             var _this = this;
-            var url = this.getUrl('texture.json');
+            var url = this.getUrl('bundle.json');
             var loader = new PIXI.JsonLoader(url);
             this.verboseLog('Loading: ' + url);
             loader.on('loaded', function () {
-                var json = loader['json'];
-                for (var i = 0; i < json.length; i++) {
-                    var item = json[i];
-                    var id = item['path'];
-                    _this.resources[id] = fl.SpriteResource.fromJson(item, _this.texture);
-                    _this.verboseLog(id);
-                }
-                _this.loadTimeline();
-            });
-            loader.load();
-        };
-        Bundle.prototype.loadTimeline = function () {
-            var _this = this;
-            var url = this.getUrl('timeline.json');
-            var loader = new PIXI.JsonLoader(url);
-            this.verboseLog('Loading: ' + url);
-            loader.on('loaded', function () {
-                var json = loader['json'];
-                for (var i = 0; i < json.length; i++) {
-                    var item = json[i];
-                    var id = item.path;
-                    _this.resources[id] = fl.ClipResource.fromJson(item);
-                    _this.verboseLog(id);
-                }
+                _this.createResources(loader['json']);
                 if (_this.completeHandler != null)
                     _this.completeHandler();
             });
             loader.load();
+        };
+        Bundle.prototype.createResources = function (description) {
+            var n = description.length;
+            for (var i = 0; i < n; i++) {
+                var entry = description[i];
+                var id = entry.path;
+                this.resources[id] = this.createResource(entry);
+                this.verboseLog(id);
+            }
+        };
+        Bundle.prototype.createResource = function (json) {
+            var type = json.type;
+            if (type == "sprite")
+                return fl.SpriteResource.fromJson(json, this.texture);
+            if (type == "clip")
+                return fl.ClipResource.fromJson(json);
+            throw new Error("Unknown resource type: " + type);
         };
         Bundle.prototype.verboseLog = function (message) {
             if (Bundle.VERBOSE_LOG)
