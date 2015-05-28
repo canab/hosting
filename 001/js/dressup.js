@@ -928,10 +928,10 @@ var dressup_game;
         function Config() {
         }
         Config.links = {
-            'small_logo': 'http://girlieroom.com/?EDs309',
-            'btn_more_seasons': 'http://girlieroom.com/?EDs309',
-            'btn_free_games': 'http://girlieroom.com/freegames/page1/?EDs309',
-            'btn_fb': 'http://facebook.com/EmilyDiary',
+            'small_logo': 'http://www.dressupgames.com/',
+            'btn_more_seasons': 'http://www.dressupgames.com/',
+            'btn_free_games': 'http://www.dressupgames.com/',
+            'btn_fb': 'http://www.dressupgames.com',
         };
         Config.parts = {
             'btn_m1_opt1': { 'path': ['model_1/opt_1'], 'exclude': [], 'allowHide': false },
@@ -1154,8 +1154,8 @@ var dressup_game;
 })(dressup_game || (dressup_game = {}));
 var dressup_game;
 (function (dressup_game) {
-    dressup_game.APP_WIDTH = 760;
-    dressup_game.APP_HEIGHT = 610;
+    dressup_game.APP_WIDTH = 800;
+    dressup_game.APP_HEIGHT = 600;
     dressup_game.STAGE_COLOR = 0xffffff;
     dressup_game.FORCE_USE_CANVAS = false;
     function initialize(containerId) {
