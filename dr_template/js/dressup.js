@@ -831,6 +831,18 @@ var fl;
                 if (_this.onRelease)
                     _this.onRelease(_this);
             };
+            this.content.touchstart = function () {
+                _this.setDownState();
+                if (_this.onPress)
+                    _this.onPress(_this);
+            };
+            this.content.touchend = function () {
+                if (_this.onRelease)
+                    _this.onRelease(_this);
+            };
+            this.content.touchendoutside = function () {
+                _this.setUpState();
+            };
             this.refreshEnabledState();
         }
         Object.defineProperty(Button.prototype, "enabled", {
