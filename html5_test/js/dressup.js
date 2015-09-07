@@ -465,65 +465,66 @@ var fl;
         };
         Clip.prototype.updateChildren = function () {
             var frame = this._resource.frames[this._currentFrame];
-            var itemIndex = 0;
+            var childIndex = 0;
             var instanceIndex = 0;
             var instanceCount = frame.instances.length;
-            while (itemIndex < this.children.length && instanceIndex < instanceCount) {
-                var item = this.children[itemIndex];
-                if (!item.isFlashObject) {
-                    itemIndex++;
+            while (childIndex < this.children.length && instanceIndex < instanceCount) {
+                var child = this.children[childIndex];
+                if (!child.isFlashObject) {
+                    childIndex++;
                     continue;
                 }
                 var instance = frame.instances[instanceIndex];
-                if (item.timelineInstanceId == instance.id) {
-                    instance.applyPropertiesTo(item);
-                    if (item.totalFrames > 1) {
+                if (child.timelineInstanceId == instance.id) {
+                    instance.applyPropertiesTo(child);
+                    if (child.totalFrames > 1) {
                         if (this.nestedPlayingType == PlayType.LOOP)
-                            item.stepForward();
+                            child.stepForward();
                         else if (this.nestedPlayingType == PlayType.ONCE)
-                            item.gotoNextFrame();
+                            child.gotoNextFrame();
                     }
                     instanceIndex++;
-                    itemIndex++;
+                    childIndex++;
                 }
-                else if (frame.hasInstance(item.timelineInstanceId)) {
-                    var newItem = this.getChildItem(instance.id);
+                else if (frame.hasInstance(child.timelineInstanceId)) {
+                    var newItem = this.getTimeLineItem(instance.id);
                     instance.applyPropertiesTo(newItem);
-                    this.setChildIndex(item, this.getChildIndex(newItem));
+                    this.addChildAt(newItem, this.getChildIndex(child));
                     instanceIndex++;
+                    childIndex++;
                 }
                 else {
-                    if (item.timelineInstanceId >= 0)
-                        this.removeChild(item);
+                    if (child.timelineInstanceId >= 0)
+                        this.removeChild(child);
                     else
-                        itemIndex++;
+                        childIndex++;
                 }
             }
             while (instanceIndex < instanceCount) {
                 var instance = frame.instances[instanceIndex];
-                var newItem = this.getChildItem(instance.id);
+                var newItem = this.getTimeLineItem(instance.id);
                 instance.applyPropertiesTo(newItem);
                 this.addChild(newItem);
                 instanceIndex++;
-                itemIndex++;
+                childIndex++;
             }
-            while (itemIndex < this.children.length) {
-                var item = this.children[itemIndex];
+            while (childIndex < this.children.length) {
+                var item = this.children[childIndex];
                 if (!item.isFlashObject) {
-                    itemIndex++;
+                    childIndex++;
                     continue;
                 }
                 if (item.timelineInstanceId >= 0)
                     this.removeChild(item);
                 else
-                    itemIndex++;
+                    childIndex++;
             }
         };
-        Clip.prototype.getChildItem = function (instanceId) {
-            var child = this._instances[instanceId];
-            child.timelineInstanceId = instanceId;
-            child.currentFrame = 0;
-            return child;
+        Clip.prototype.getTimeLineItem = function (instanceId) {
+            var instance = this._instances[instanceId];
+            instance.timelineInstanceId = instanceId;
+            instance.currentFrame = 0;
+            return instance;
         };
         Object.defineProperty(Clip.prototype, "resource", {
             get: function () {
