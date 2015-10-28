@@ -1,4 +1,5 @@
-var __extends = this.__extends || function (d, b) {
+/// <reference path="Core.ts" />
+var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
     __.prototype = b.prototype;
@@ -73,6 +74,7 @@ var fl;
     })(PIXI.DisplayObject);
     fl.FlashObject = FlashObject;
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Animation = (function () {
@@ -151,6 +153,7 @@ var fl;
     })();
     fl.Animation = Animation;
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Resource = (function () {
@@ -174,6 +177,7 @@ var fl;
     })();
     fl.Resource = Resource;
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Bundle = (function () {
@@ -226,7 +230,8 @@ var fl;
         };
         Bundle.prototype.unload = function () {
             var _this = this;
-            Object.keys(this.resources).forEach(function (key) { return _this.resources[key].dispose(); });
+            Object.keys(this.resources)
+                .forEach(function (key) { return _this.resources[key].dispose(); });
             this.texture.destroy(true);
             this.texture = null;
         };
@@ -283,6 +288,7 @@ var fl;
     })();
     fl.Bundle = Bundle;
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Container = (function (_super) {
@@ -298,16 +304,12 @@ var fl;
             this.globalColor = {};
         }
         Object.defineProperty(Container.prototype, "totalFrames", {
-            get: function () {
-                return this._totalFrames;
-            },
+            get: function () { return this._totalFrames; },
             enumerable: true,
             configurable: true
         });
         Object.defineProperty(Container.prototype, "currentFrame", {
-            get: function () {
-                return this._currentFrame;
-            },
+            get: function () { return this._currentFrame; },
             set: function (value) {
                 if (this._currentFrame != value) {
                     this._currentFrame = fl.clampRange(value, 0, this._totalFrames - 1);
@@ -319,7 +321,8 @@ var fl;
         });
         Object.defineProperty(Container.prototype, "animation", {
             get: function () {
-                return this._animation || (this._animation = new fl.Animation(this));
+                return this._animation
+                    || (this._animation = new fl.Animation(this));
             },
             enumerable: true,
             configurable: true
@@ -419,6 +422,7 @@ var fl;
     })(PIXI.DisplayObjectContainer);
     fl.Container = Container;
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     (function (PlayType) {
@@ -431,7 +435,7 @@ var fl;
         __extends(Clip, _super);
         function Clip(resource) {
             _super.call(this);
-            this.nestedPlayingType = 0 /* LOOP */;
+            this.nestedPlayingType = PlayType.LOOP;
             this._instances = [];
             this._resource = resource;
             this._totalFrames = resource.frames.length;
@@ -461,65 +465,66 @@ var fl;
         };
         Clip.prototype.updateChildren = function () {
             var frame = this._resource.frames[this._currentFrame];
-            var itemIndex = 0;
+            var childIndex = 0;
             var instanceIndex = 0;
             var instanceCount = frame.instances.length;
-            while (itemIndex < this.children.length && instanceIndex < instanceCount) {
-                var item = this.children[itemIndex];
-                if (!item.isFlashObject) {
-                    itemIndex++;
+            while (childIndex < this.children.length && instanceIndex < instanceCount) {
+                var child = this.children[childIndex];
+                if (!child.isFlashObject) {
+                    childIndex++;
                     continue;
                 }
                 var instance = frame.instances[instanceIndex];
-                if (item.timelineInstanceId == instance.id) {
-                    instance.applyPropertiesTo(item);
-                    if (item.totalFrames > 1) {
-                        if (this.nestedPlayingType == 0 /* LOOP */)
-                            item.stepForward();
-                        else if (this.nestedPlayingType == 1 /* ONCE */)
-                            item.gotoNextFrame();
+                if (child.timelineInstanceId == instance.id) {
+                    instance.applyPropertiesTo(child);
+                    if (child.totalFrames > 1) {
+                        if (this.nestedPlayingType == PlayType.LOOP)
+                            child.stepForward();
+                        else if (this.nestedPlayingType == PlayType.ONCE)
+                            child.gotoNextFrame();
                     }
                     instanceIndex++;
-                    itemIndex++;
+                    childIndex++;
                 }
-                else if (frame.hasInstance(item.timelineInstanceId)) {
-                    var newItem = this.getChildItem(instance.id);
+                else if (frame.hasInstance(child.timelineInstanceId)) {
+                    var newItem = this.getTimeLineItem(instance.id);
                     instance.applyPropertiesTo(newItem);
-                    this.setChildIndex(item, this.getChildIndex(newItem));
+                    this.addChildAt(newItem, this.getChildIndex(child));
                     instanceIndex++;
+                    childIndex++;
                 }
                 else {
-                    if (item.timelineInstanceId >= 0)
-                        this.removeChild(item);
+                    if (child.timelineInstanceId >= 0)
+                        this.removeChild(child);
                     else
-                        itemIndex++;
+                        childIndex++;
                 }
             }
             while (instanceIndex < instanceCount) {
                 var instance = frame.instances[instanceIndex];
-                var newItem = this.getChildItem(instance.id);
+                var newItem = this.getTimeLineItem(instance.id);
                 instance.applyPropertiesTo(newItem);
                 this.addChild(newItem);
                 instanceIndex++;
-                itemIndex++;
+                childIndex++;
             }
-            while (itemIndex < this.children.length) {
-                var item = this.children[itemIndex];
+            while (childIndex < this.children.length) {
+                var item = this.children[childIndex];
                 if (!item.isFlashObject) {
-                    itemIndex++;
+                    childIndex++;
                     continue;
                 }
                 if (item.timelineInstanceId >= 0)
                     this.removeChild(item);
                 else
-                    itemIndex++;
+                    childIndex++;
             }
         };
-        Clip.prototype.getChildItem = function (instanceId) {
-            var child = this._instances[instanceId];
-            child.timelineInstanceId = instanceId;
-            child.currentFrame = 0;
-            return child;
+        Clip.prototype.getTimeLineItem = function (instanceId) {
+            var instance = this._instances[instanceId];
+            instance.timelineInstanceId = instanceId;
+            instance.currentFrame = 0;
+            return instance;
         };
         Object.defineProperty(Clip.prototype, "resource", {
             get: function () {
@@ -551,6 +556,7 @@ var fl;
     })(fl.Container);
     fl.Clip = Clip;
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var ClipResource = (function (_super) {
@@ -634,7 +640,9 @@ var fl;
         function FrameData() {
         }
         FrameData.prototype.hasInstance = function (id) {
-            return id >= 0 && id < this.existingInstancesBits.length && this.existingInstancesBits[id];
+            return id >= 0
+                && id < this.existingInstancesBits.length
+                && this.existingInstancesBits[id];
         };
         FrameData.EMPTY_LABELS = [];
         return FrameData;
@@ -675,6 +683,7 @@ var fl;
         return InstanceData;
     })();
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Sprite = (function (_super) {
@@ -693,16 +702,12 @@ var fl;
             this.handleFrameChange();
         }
         Object.defineProperty(Sprite.prototype, "totalFrames", {
-            get: function () {
-                return this._totalFrames;
-            },
+            get: function () { return this._totalFrames; },
             enumerable: true,
             configurable: true
         });
         Object.defineProperty(Sprite.prototype, "currentFrame", {
-            get: function () {
-                return this._currentFrame;
-            },
+            get: function () { return this._currentFrame; },
             set: function (value) {
                 if (this._currentFrame != value) {
                     this._currentFrame = fl.clampRange(value, 0, this._totalFrames - 1);
@@ -714,7 +719,8 @@ var fl;
         });
         Object.defineProperty(Sprite.prototype, "animation", {
             get: function () {
-                return this._animation || (this._animation = new fl.Animation(this));
+                return this._animation
+                    || (this._animation = new fl.Animation(this));
             },
             enumerable: true,
             configurable: true
@@ -762,6 +768,7 @@ var fl;
     })(PIXI.Sprite);
     fl.Sprite = Sprite;
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var SpriteFrame = (function () {
@@ -784,7 +791,9 @@ var fl;
             for (var i = 0; i < data.frames.length; i++) {
                 var props = data.frames[i];
                 var bounds = new PIXI.Rectangle(props[0], props[1], props[2], props[3]);
-                var anchor = (bounds.width > 0 && bounds.height > 0) ? new PIXI.Point(props[4] / bounds.width, props[5] / bounds.height) : new PIXI.Point();
+                var anchor = (bounds.width > 0 && bounds.height > 0)
+                    ? new PIXI.Point(props[4] / bounds.width, props[5] / bounds.height)
+                    : new PIXI.Point();
                 var frame = {
                     texture: new PIXI.Texture(texture.baseTexture, bounds),
                     anchor: anchor,
@@ -807,6 +816,7 @@ var fl;
     })(fl.Resource);
     fl.SpriteResource = SpriteResource;
 })(fl || (fl = {}));
+/// <reference path="Core.ts" />
 var fl;
 (function (fl) {
     var Button = (function () {
@@ -837,6 +847,7 @@ var fl;
                     _this.onPress(_this);
             };
             this.content.touchend = function () {
+                _this.setUpState();
                 if (_this.onRelease)
                     _this.onRelease(_this);
             };
@@ -846,9 +857,7 @@ var fl;
             this.refreshEnabledState();
         }
         Object.defineProperty(Button.prototype, "enabled", {
-            get: function () {
-                return this._enabled;
-            },
+            get: function () { return this._enabled; },
             set: function (value) {
                 if (this._enabled != value) {
                     this._enabled = value;
@@ -872,6 +881,17 @@ var fl;
     })();
     fl.Button = Button;
 })(fl || (fl = {}));
+/// <reference path="../lib/pixi.d.ts" />
+/// <reference path="FlashObject.ts" />
+/// <reference path="Animation.ts" />
+/// <reference path="Resource.ts" />
+/// <reference path="Bundle.ts" />
+/// <reference path="Container.ts" />
+/// <reference path="Clip.ts" />
+/// <reference path="ClipResource.ts" />
+/// <reference path="Sprite.ts" />
+/// <reference path="SpriteResource.ts" />
+/// <reference path="Button.ts" />
 var fl;
 (function (fl) {
     applyMixins(fl.Container, fl.FlashObject);
@@ -915,6 +935,8 @@ var fl;
     })();
     fl.Internal = Internal;
 })(fl || (fl = {}));
+// Generated code!
+// see build.rb
 var dressup_game;
 (function (dressup_game) {
     var PartConfig = (function () {
@@ -927,16 +949,16 @@ var dressup_game;
         function Config() {
         }
         Config.links = {
-            'small_logo': 'http://girlieroom.com/?EDs309',
-            'btn_more_seasons': 'http://girlieroom.com/?EDs309',
-            'btn_free_games': 'http://girlieroom.com/freegames/page1/?EDs309',
-            'btn_fb': 'http://facebook.com/EmilyDiary',
+            'small_logo': 'http://www.dressupgames.com/',
+            'btn_more_seasons': 'http://www.dressupgames.com/',
+            'btn_free_games': 'http://http://www.dressupgames.com/',
+            'btn_fb': 'http://facebook.com/dressupgames',
         };
         Config.parts = {
             'btn_m1_opt1': { 'path': ['model_1/opt_1'], 'exclude': [], 'allowHide': false },
-            'btn_m1_opt2': { 'path': ['model_1/opt_2'], 'exclude': ['model_1/opt_3', 'model_1/opt_4'], 'allowHide': true },
+            'btn_m1_opt2': { 'path': ['model_1/opt_2'], 'exclude': ['model_1/opt_3'], 'allowHide': true },
             'btn_m1_opt3': { 'path': ['model_1/opt_3'], 'exclude': ['model_1/opt_2'], 'allowHide': true },
-            'btn_m1_opt4': { 'path': ['model_1/opt_4'], 'exclude': ['model_1/opt_2'], 'allowHide': true },
+            'btn_m1_opt4': { 'path': ['model_1/opt_4'], 'exclude': [], 'allowHide': true },
             'btn_m1_opt5': { 'path': ['model_1/opt_5'], 'exclude': [], 'allowHide': true },
             'btn_m1_opt6': { 'path': ['model_1/opt_6'], 'exclude': [], 'allowHide': true },
             'btn_m1_opt7': { 'path': ['model_1/opt_7'], 'exclude': [], 'allowHide': true },
@@ -949,9 +971,9 @@ var dressup_game;
             'btn_m1_opt14': { 'path': ['model_1/opt_14'], 'exclude': [], 'allowHide': true },
             'btn_m1_opt15': { 'path': ['model_1/opt_15'], 'exclude': [], 'allowHide': true },
             'btn_m2_opt1': { 'path': ['model_2/opt_1'], 'exclude': [], 'allowHide': false },
-            'btn_m2_opt2': { 'path': ['model_2/opt_2'], 'exclude': ['model_2/opt_3', 'model_2/opt_4'], 'allowHide': true },
+            'btn_m2_opt2': { 'path': ['model_2/opt_2'], 'exclude': ['model_2/opt_3'], 'allowHide': true },
             'btn_m2_opt3': { 'path': ['model_2/opt_3'], 'exclude': ['model_2/opt_2'], 'allowHide': true },
-            'btn_m2_opt4': { 'path': ['model_2/opt_4'], 'exclude': ['model_2/opt_2'], 'allowHide': true },
+            'btn_m2_opt4': { 'path': ['model_2/opt_4'], 'exclude': [], 'allowHide': true },
             'btn_m2_opt5': { 'path': ['model_2/opt_5'], 'exclude': [], 'allowHide': true },
             'btn_m2_opt6': { 'path': ['model_2/opt_6'], 'exclude': [], 'allowHide': true },
             'btn_m2_opt7': { 'path': ['model_2/opt_7'], 'exclude': [], 'allowHide': true },
@@ -1027,7 +1049,7 @@ var dressup_game;
             });
             this.loadingClip = this.getElement('loading');
             var intro = this.getElement('intro_anim');
-            intro.nestedPlayingType = 1 /* ONCE */;
+            intro.nestedPlayingType = fl.PlayType.ONCE;
             intro.animation.playToEnd();
             this.loadSceneBundle();
         }
@@ -1053,9 +1075,14 @@ var dressup_game;
             var _this = this;
             _super.call(this, 'SceneScreen', fl.Bundle.createClip('scene/scene_screen'));
             this._backButton = this.createBackButton();
-            this._models = this.content.getAllByPrefix(SceneScreen.MODEL_PREFIX).map(function (it) { return _this.processModel(it); });
-            this._partButtons = this.content.getAllByPrefix(SceneScreen.PART_BTN_PREFIX).map(function (it) { return new fl.Button(it, function (btn) { return _this.onPartButtonClick(btn); }); });
-            this._backgrounds = this.content.getAllByPrefix(SceneScreen.BG_PREFIX);
+            this._models = this.content
+                .getAllByPrefix(SceneScreen.MODEL_PREFIX)
+                .map(function (it) { return _this.processModel(it); });
+            this._partButtons = this.content
+                .getAllByPrefix(SceneScreen.PART_BTN_PREFIX)
+                .map(function (it) { return new fl.Button(it, function (btn) { return _this.onPartButtonClick(btn); }); });
+            this._backgrounds = this.content
+                .getAllByPrefix(SceneScreen.BG_PREFIX);
             this._controls = this.initControlPanel();
         }
         SceneScreen.prototype.createBackButton = function () {
@@ -1066,7 +1093,8 @@ var dressup_game;
         };
         SceneScreen.prototype.processModel = function (model) {
             var _this = this;
-            model.getAllByPrefix(SceneScreen.PART_PREFIX).forEach(function (it) { return _this.processModelPart(it); });
+            model.getAllByPrefix(SceneScreen.PART_PREFIX)
+                .forEach(function (it) { return _this.processModelPart(it); });
             return model;
         };
         SceneScreen.prototype.processModelPart = function (part) {
@@ -1117,7 +1145,7 @@ var dressup_game;
         SceneScreen.prototype.initControlPanel = function () {
             var _this = this;
             var controls = this.content.getElement('controls');
-            controls.nestedPlayingType = 2 /* NONE */;
+            controls.nestedPlayingType = fl.PlayType.NONE;
             new fl.Button(controls.getElement('btn_reset'), function () {
                 _this.resetModels();
             });
@@ -1151,6 +1179,11 @@ var dressup_game;
     })(dressup_game.AppScreen);
     dressup_game.SceneScreen = SceneScreen;
 })(dressup_game || (dressup_game = {}));
+/// <reference path="fl/Core.ts" />
+/// <reference path="Config.ts" />
+/// <reference path="AppScreen.ts" />
+/// <reference path="IntroScreen.ts" />
+/// <reference path="SceneScreen.ts" />
 var dressup_game;
 (function (dressup_game) {
     dressup_game.APP_WIDTH = 760;
@@ -1176,7 +1209,9 @@ var dressup_game;
         };
         App.initStage = function () {
             App.stage = new PIXI.Stage(dressup_game.STAGE_COLOR);
-            App.renderer = dressup_game.FORCE_USE_CANVAS ? new PIXI.CanvasRenderer(dressup_game.APP_WIDTH, dressup_game.APP_HEIGHT) : PIXI.autoDetectRenderer(dressup_game.APP_WIDTH, dressup_game.APP_HEIGHT);
+            App.renderer = dressup_game.FORCE_USE_CANVAS
+                ? new PIXI.CanvasRenderer(dressup_game.APP_WIDTH, dressup_game.APP_HEIGHT)
+                : PIXI.autoDetectRenderer(dressup_game.APP_WIDTH, dressup_game.APP_HEIGHT);
         };
         App.loadIntro = function () {
             fl.Bundle.load('intro', function () { return App.changeScreen(new dressup_game.IntroScreen()); });
