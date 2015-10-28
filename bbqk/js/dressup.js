@@ -948,6 +948,8 @@ var dressup_game;
     var Config = (function () {
         function Config() {
         }
+        Config.width = 800;
+        Config.height = 600;
         Config.links = {
             'small_logo': 'http://www.dressupgames.com/',
             'btn_more_seasons': 'http://www.dressupgames.com/',
@@ -1151,15 +1153,12 @@ var dressup_game;
             });
             new fl.Button(controls.getElement('btn_photo'), function () {
                 _this.setControlsVisible(false);
-                dressup_game.App.shareOnFacebook();
-                _this.setControlsVisible(true);
             });
             return controls;
         };
         SceneScreen.prototype.setControlsVisible = function (value) {
             this._partButtons.forEach(function (it) { return it.content.visible = value; });
             this._backButton.content.visible = value;
-            this._controls.currentFrame = value ? 0 : 1;
         };
         SceneScreen.prototype.resetModels = function () {
             var _this = this;
@@ -1186,8 +1185,6 @@ var dressup_game;
 /// <reference path="SceneScreen.ts" />
 var dressup_game;
 (function (dressup_game) {
-    dressup_game.APP_WIDTH = 760;
-    dressup_game.APP_HEIGHT = 610;
     dressup_game.STAGE_COLOR = 0xffffff;
     dressup_game.FORCE_USE_CANVAS = false;
     function initialize(containerId) {
@@ -1210,8 +1207,8 @@ var dressup_game;
         App.initStage = function () {
             App.stage = new PIXI.Stage(dressup_game.STAGE_COLOR);
             App.renderer = dressup_game.FORCE_USE_CANVAS
-                ? new PIXI.CanvasRenderer(dressup_game.APP_WIDTH, dressup_game.APP_HEIGHT)
-                : PIXI.autoDetectRenderer(dressup_game.APP_WIDTH, dressup_game.APP_HEIGHT);
+                ? new PIXI.CanvasRenderer(dressup_game.Config.width, dressup_game.Config.height)
+                : PIXI.autoDetectRenderer(dressup_game.Config.width, dressup_game.Config.height);
         };
         App.loadIntro = function () {
             fl.Bundle.load('intro', function () { return App.changeScreen(new dressup_game.IntroScreen()); });
@@ -1233,8 +1230,6 @@ var dressup_game;
             App._screen = screen;
             if (App._screen)
                 App.stage.addChild(App._screen.content);
-        };
-        App.shareOnFacebook = function () {
         };
         Object.defineProperty(App, "canvas", {
             get: function () {
