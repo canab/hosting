@@ -254,9 +254,12 @@ var fl;
             this.textures = {};
             for (var _i = 0, _a = this.rawData["textures"]; _i < _a.length; _i++) {
                 var textureName = _a[_i];
+                this.textures[textureName] = null;
+            }
+            for (var _b = 0, _c = this.rawData["textures"]; _b < _c.length; _b++) {
+                var textureName = _c[_b];
                 var url = this.getUrl(textureName + Bundle.TEXTURE_EXT);
                 this.verboseLog('loading: ' + url);
-                this.textures[textureName] = null;
                 var loader = new PIXI.ImageLoader(url);
                 loader.on('loaded', this.createTextureLoadedHandler(textureName, loader));
                 loader.load();
