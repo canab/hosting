@@ -2,7 +2,8 @@
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    __.prototype = b.prototype;
+    d.prototype = new __();
 };
 var fl;
 (function (fl) {
@@ -288,7 +289,6 @@ var fl;
                 var symbol = _a[_i];
                 var id = symbol.path;
                 this.resources[id] = this.createResource(symbol);
-                this.verboseLog(id);
             }
         };
         Bundle.prototype.createResource = function (json) {
@@ -311,7 +311,7 @@ var fl;
         Bundle.prototype.getUrl = function (assetName) {
             return "assets/" + this.name + "/" + assetName;
         };
-        Bundle.VERBOSE_LOG = false;
+        Bundle.VERBOSE_LOG = true;
         Bundle.TEXTURE_EXT = ".png";
         Bundle._bundles = {};
         return Bundle;
@@ -331,7 +331,6 @@ var fl;
             this.color = { r: 1, g: 1, b: 1, a: 1 };
             this._currentFrame = 0;
             this._totalFrames = 1;
-            //endregion
             this.globalColor = {};
         }
         Object.defineProperty(Container.prototype, "totalFrames", {
@@ -726,7 +725,6 @@ var fl;
 (function (fl) {
     var Sprite = (function (_super) {
         __extends(Sprite, _super);
-        //endregion
         function Sprite(resource) {
             _super.call(this, null);
             this.timelineInstanceId = -1;
@@ -873,10 +871,8 @@ var fl;
 var fl;
 (function (fl) {
     var Button = (function () {
-        //endregion
         function Button(target, action) {
             var _this = this;
-            //region enabled
             this._enabled = true;
             fl.assertPresent(target, "target");
             this.content = target;
@@ -951,6 +947,7 @@ var fl;
 (function (fl) {
     applyMixins(fl.Container, fl.FlashObject);
     applyMixins(fl.Sprite, fl.FlashObject);
+    fl.onLabel;
     function applyMixins(derived, base) {
         Object.getOwnPropertyNames(base.prototype).forEach(function (name) {
             derived.prototype[name] = base.prototype[name];
@@ -1002,24 +999,15 @@ var dressup_game;
     var Config = (function () {
         function Config() {
         }
-        //{SIZE}
         Config.width = 760;
         Config.height = 610;
-        //{SIZE}
-        /**
-         * Bindings for link buttons.
-         * Each screen is recursively scanned for links.
-         * If object's name is present in this map, button with navigation action is created
-         * */
         Config.links = {
-            //{LINKS}
             'small_logo': 'http://www.dressupgames.com/',
             'btn_more_seasons': 'http://www.dressupgames.com/',
             'btn_free_games': 'http://http://www.dressupgames.com/',
             'btn_fb': 'http://facebook.com/dressupgames',
         };
         Config.parts = {
-            //{CONFIG}
             'btn_m1_opt1': { 'path': ['model_1/opt_1'], 'exclude': [], 'allowHide': false },
             'btn_m1_opt2': { 'path': ['model_1/opt_2'], 'exclude': ['model_1/opt_3', 'model_1/opt_4'], 'allowHide': true },
             'btn_m1_opt3': { 'path': ['model_1/opt_3'], 'exclude': ['model_1/opt_2'], 'allowHide': true },
@@ -1072,7 +1060,6 @@ var dressup_game;
 })(dressup_game || (dressup_game = {}));
 var dressup_game;
 (function (dressup_game) {
-    /** Base class for all screens */
     var AppScreen = (function () {
         function AppScreen(name, content) {
             this.name = "AppScreen";
@@ -1087,12 +1074,10 @@ var dressup_game;
             var _this = this;
             content.instances.forEach(function (it) {
                 var url;
-                /** check whether object is link button */
                 if (url = dressup_game.Config.links[it.name]) {
                     new fl.Button(it, function () { return window.open(url, '_blank'); });
                     return;
                 }
-                /** autoplay objects without name */
                 if (!it.name && it.totalFrames > 1) {
                     it.animation.play();
                     return;
@@ -1210,9 +1195,6 @@ var dressup_game;
             else
                 throw new Error("Config not found: " + optionId);
         };
-        //
-        // ControlPanel
-        //
         SceneScreen.prototype.initControlPanel = function () {
             var _this = this;
             var controls = this.content.getElement('controls');
@@ -1277,7 +1259,6 @@ var dressup_game;
         container.appendChild(App.canvas);
     }
     dressup_game.initialize = initialize;
-    /** Application facade */
     var App = (function () {
         function App() {
         }
