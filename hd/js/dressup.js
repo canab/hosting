@@ -2,8 +2,7 @@
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 var fl;
 (function (fl) {
@@ -252,16 +251,17 @@ var fl;
         };
         Bundle.prototype.loadTextures = function () {
             this.textures = {};
-            for (var _i = 0, _a = this.rawData["textures"]; _i < _a.length; _i++) {
-                var textureName = _a[_i];
-                this.textures[textureName] = null;
+            var names = this.rawData["textures"];
+            for (var _i = 0; _i < names.length; _i++) {
+                var name = names[_i];
+                this.textures[name] = null;
             }
-            for (var _b = 0, _c = this.rawData["textures"]; _b < _c.length; _b++) {
-                var textureName = _c[_b];
-                var url = this.getUrl(textureName + Bundle.TEXTURE_EXT);
+            for (var _a = 0; _a < names.length; _a++) {
+                var name = names[_a];
+                var url = this.getUrl(name + Bundle.TEXTURE_EXT);
                 this.verboseLog('loading: ' + url);
                 var loader = new PIXI.ImageLoader(url);
-                loader.on('loaded', this.createTextureLoadedHandler(textureName, loader));
+                loader.on('loaded', this.createTextureLoadedHandler(name, loader));
                 loader.load();
             }
         };
@@ -927,13 +927,35 @@ var fl;
         };
         Button.prototype.setDownState = function () {
             this.content.currentFrame = 1;
+            this.content.updateTransform();
         };
         Button.prototype.setUpState = function () {
             this.content.currentFrame = 0;
+            this.content.updateTransform();
         };
         return Button;
     })();
     fl.Button = Button;
+})(fl || (fl = {}));
+/// <reference path="Core.ts" />
+var fl;
+(function (fl) {
+    var Anchor = (function () {
+        function Anchor(source, sourceProperty, target, targetProperty, multiplier) {
+            if (multiplier === void 0) { multiplier = 1.0; }
+            this._target = target;
+            this._targetProperty = targetProperty;
+            this._source = source;
+            this._sourceProperty = sourceProperty;
+            this._multiplier = multiplier;
+            this._distance = source[sourceProperty] * multiplier - target[targetProperty];
+        }
+        Anchor.prototype.apply = function () {
+            this._target[this._targetProperty] = this._source[this._sourceProperty] * this._multiplier - this._distance;
+        };
+        return Anchor;
+    })();
+    fl.Anchor = Anchor;
 })(fl || (fl = {}));
 /// <reference path="../lib/pixi.d.ts" />
 /// <reference path="FlashObject.ts" />
@@ -946,11 +968,11 @@ var fl;
 /// <reference path="Sprite.ts" />
 /// <reference path="SpriteResource.ts" />
 /// <reference path="Button.ts" />
+/// <reference path="Anchor.ts" />
 var fl;
 (function (fl) {
     applyMixins(fl.Container, fl.FlashObject);
     applyMixins(fl.Sprite, fl.FlashObject);
-    fl.onLabel;
     function applyMixins(derived, base) {
         Object.getOwnPropertyNames(base.prototype).forEach(function (name) {
             derived.prototype[name] = base.prototype[name];
@@ -1002,8 +1024,8 @@ var dressup_game;
     var Config = (function () {
         function Config() {
         }
-        Config.width = 760;
-        Config.height = 610;
+        Config.width = 1024;
+        Config.height = 768;
         Config.links = {
             'small_logo': 'http://www.dressupgames.com/',
             'btn_more_seasons': 'http://www.dressupgames.com/',
@@ -1066,10 +1088,21 @@ var dressup_game;
     var AppScreen = (function () {
         function AppScreen(name, content) {
             this.name = "AppScreen";
+            this._size = new PIXI.Point();
+            this._anchors = [];
+            this._reserv = 170;
             this.name = name;
             this.content = content;
+            this._size.x = dressup_game.Config.width;
+            this._size.y = dressup_game.Config.height;
             this.configureContent(content);
+            this.addAnchors();
         }
+        AppScreen.prototype.addAnchors = function () {
+            var _this = this;
+            this.content.getAllByPrefix("btn")
+                .forEach(function (v, i, a) { return _this.anchorToSide(v); });
+        };
         AppScreen.prototype.getElement = function (name) {
             return this.content.getElement(name);
         };
@@ -1088,6 +1121,74 @@ var dressup_game;
                 if (it instanceof fl.Clip)
                     _this.configureContent(it);
             });
+        };
+        AppScreen.prototype.addAnchor = function (source, sourceProperty, target, targetProperty, multiplier) {
+            if (multiplier === void 0) { multiplier = 1.0; }
+            this._anchors.push(new fl.Anchor(source, sourceProperty, target, targetProperty, multiplier));
+        };
+        AppScreen.prototype.anchorToSide = function (source) {
+            var threshold = 0.25 * dressup_game.Config.width;
+            if (dressup_game.Config.width - source.x < threshold)
+                this.addAnchor(this, "contentRight", source, "x");
+            else if (source.x < threshold)
+                this.addAnchor(this, "contentLeft", source, "x");
+        };
+        Object.defineProperty(AppScreen.prototype, "contentLeft", {
+            get: function () {
+                var left = (-this.content.x) / this.content.scale.x;
+                return Math.max(-this._reserv, left);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(AppScreen.prototype, "contentRight", {
+            get: function () {
+                var right = (this.width - this.content.x) / this.content.scale.x;
+                return Math.min(right, dressup_game.Config.width + this._reserv);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        AppScreen.prototype.validateLayout = function () {
+            var scaleY = this.height / dressup_game.Config.height;
+            var scaleX = this.width / dressup_game.Config.width;
+            var scale = Math.min(scaleX, scaleY);
+            this.content.scale.x = scale;
+            this.content.scale.y = scale;
+            this.content.x = 0.5 * (this.width - dressup_game.Config.width * scale);
+            for (var _i = 0, _a = this._anchors; _i < _a.length; _i++) {
+                var a = _a[_i];
+                a.apply();
+            }
+            this.onLayoutChanged();
+        };
+        AppScreen.prototype.onLayoutChanged = function () { };
+        ;
+        Object.defineProperty(AppScreen.prototype, "width", {
+            get: function () {
+                return this._size.x;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(AppScreen.prototype, "height", {
+            get: function () {
+                return this._size.y;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(AppScreen.prototype, "size", {
+            get: function () {
+                return this._size;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        AppScreen.prototype.resize = function (x, y) {
+            this._size.x = x;
+            this._size.y = y;
+            this.validateLayout();
         };
         return AppScreen;
     })();
@@ -1128,32 +1229,34 @@ var dressup_game;
     var SceneScreen = (function (_super) {
         __extends(SceneScreen, _super);
         function SceneScreen() {
-            var _this = this;
             _super.call(this, 'SceneScreen', fl.Bundle.createClip('scene/scene_screen'));
-            this._backButton = this.createBackButton();
-            this._models = this.content
-                .getAllByPrefix(SceneScreen.MODEL_PREFIX)
-                .map(function (it) { return _this.processModel(it); });
-            this._partButtons = this.content
-                .getAllByPrefix(SceneScreen.PART_BTN_PREFIX)
-                .map(function (it) { return new fl.Button(it, function (btn) { return _this.onPartButtonClick(btn); }); });
+            this._models = [];
+            this._partButtons = [];
+            this._backgrounds = [];
+            this.initBackgrounds();
+            this.initModels();
+            this.initModelButtons();
+            this.initControlButtons();
+        }
+        SceneScreen.prototype.initBackgrounds = function () {
+            var _this = this;
             this._backgrounds = this.content
                 .getAllByPrefix(SceneScreen.BG_PREFIX);
-            this._controls = this.initControlPanel();
-        }
-        SceneScreen.prototype.createBackButton = function () {
-            var _this = this;
-            return new fl.Button(this.content.getElement('btnBackground'), function () {
+            this._bgButton = new fl.Button(this.content.getElement('btn_bg'), function () {
                 _this._backgrounds.forEach(function (it) { return it.stepForward(); });
             });
         };
-        SceneScreen.prototype.processModel = function (model) {
+        SceneScreen.prototype.initModels = function () {
             var _this = this;
-            model.getAllByPrefix(SceneScreen.PART_PREFIX)
-                .forEach(function (it) { return _this.processModelPart(it); });
-            return model;
+            this._models = this.content
+                .getAllByPrefix(SceneScreen.MODEL_PREFIX);
+            for (var _i = 0, _a = this._models; _i < _a.length; _i++) {
+                var model = _a[_i];
+                model.getAllByPrefix(SceneScreen.PART_PREFIX)
+                    .forEach(function (it) { return _this.initModelPart(it); });
+            }
         };
-        SceneScreen.prototype.processModelPart = function (part) {
+        SceneScreen.prototype.initModelPart = function (part) {
             var cfg = this.getPartConfig(part);
             if (cfg.allowHide) {
                 part.interactive = true;
@@ -1161,6 +1264,12 @@ var dressup_game;
                 part.mouseup = function (it) { return part.visible = false; };
             }
             part.visible = part.gotoLabel('default_frame');
+        };
+        SceneScreen.prototype.initModelButtons = function () {
+            var _this = this;
+            this._partButtons = this.content
+                .getAllByPrefix(SceneScreen.PART_BTN_PREFIX)
+                .map(function (it) { return new fl.Button(it, function (btn) { return _this.onPartButtonClick(btn); }); });
         };
         SceneScreen.prototype.onPartButtonClick = function (btn) {
             var _this = this;
@@ -1198,34 +1307,43 @@ var dressup_game;
             else
                 throw new Error("Config not found: " + optionId);
         };
-        SceneScreen.prototype.initControlPanel = function () {
+        SceneScreen.prototype.onLayoutChanged = function () {
+        };
+        SceneScreen.prototype.initControlButtons = function () {
             var _this = this;
-            var controls = this.content.getElement('controls');
-            controls.nestedPlayingType = fl.PlayType.NONE;
-            var saveBtn = controls.tryGetElement("btn_save");
+            var saveBtn = this.content.tryGetElement("btn_save");
             if (saveBtn)
                 saveBtn.visible = false;
-            this.tryCreateButton(controls, "btn_reset", function () {
+            this.tryCreateButton("btn_reset", function () {
                 _this.resetModels();
             });
-            this.tryCreateButton(controls, "btn_photo", function () {
+            this.tryCreateButton("btn_photo", function () {
                 _this.setControlsVisible(false);
-                controls.currentFrame = 1;
+                _this.tryVisibleButton("btn_photo", false);
+                _this.tryVisibleButton("btn_reset", false);
+                _this.tryVisibleButton("btn_back", true);
             });
-            this.tryCreateButton(controls, "btn_back", function () {
+            this.tryCreateButton("btn_back", function () {
                 _this.setControlsVisible(true);
-                controls.currentFrame = 0;
+                _this.tryVisibleButton("btn_photo", true);
+                _this.tryVisibleButton("btn_reset", true);
+                _this.tryVisibleButton("btn_back", false);
             });
-            return controls;
+            this.tryVisibleButton("btn_back", false);
         };
-        SceneScreen.prototype.tryCreateButton = function (container, name, action) {
-            var clip = container.tryGetElement(name);
+        SceneScreen.prototype.tryCreateButton = function (name, action) {
+            var clip = this.content.tryGetElement(name);
             if (clip)
                 new fl.Button(clip, action);
         };
+        SceneScreen.prototype.tryVisibleButton = function (name, value) {
+            var clip = this.content.tryGetElement(name);
+            if (clip)
+                clip.visible = value;
+        };
         SceneScreen.prototype.setControlsVisible = function (value) {
             this._partButtons.forEach(function (it) { return it.content.visible = value; });
-            this._backButton.content.visible = value;
+            this._bgButton.content.visible = value;
         };
         SceneScreen.prototype.resetModels = function () {
             var _this = this;
@@ -1301,9 +1419,7 @@ var dressup_game;
         };
         App.refreshScreenScale = function () {
             if (App._screen) {
-                var appScale = Math.min(App.renderer.width / dressup_game.Config.width, App.renderer.height / dressup_game.Config.height);
-                App._screen.content.scale.x = appScale;
-                App._screen.content.scale.y = appScale;
+                App._screen.resize(App.renderer.width, App.renderer.height);
             }
         };
         App.changeScreen = function (screen) {
