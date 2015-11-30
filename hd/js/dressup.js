@@ -1202,6 +1202,7 @@ var dressup_game;
             _super.call(this, 'IntroScreen', fl.Bundle.createClip('intro/intro_screen'));
             this.playButton = new fl.Button(this.getElement('btn_play'), function () {
                 fl.Bundle.unload('intro');
+                dressup_game.App.gotoFullScreen();
                 dressup_game.App.changeScreen(new dressup_game.SceneScreen());
             });
             this.loadingClip = this.getElement('loading');
@@ -1444,6 +1445,18 @@ var dressup_game;
             enumerable: true,
             configurable: true
         });
+        App.gotoFullScreen = function () {
+            var el = App.renderer.view;
+            if (el.webkitRequestFullScreen)
+                el.webkitRequestFullScreen();
+            else
+                el.mozRequestFullScreen();
+        };
+        App.exitFullScreen = function () {
+            var doc = document;
+            doc.webkitCancelFullScreen();
+            doc.mozCancelFullScreen();
+        };
         App.isLayoutValid = false;
         return App;
     })();
