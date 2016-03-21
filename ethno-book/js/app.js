@@ -5,12 +5,6 @@ var __extends = (this && this.__extends) || function (d, b) {
 };
 var fl;
 (function (fl) {
-    var FrameLabel = (function () {
-        function FrameLabel() {
-        }
-        return FrameLabel;
-    }());
-    fl.FrameLabel = FrameLabel;
     var FlashObject = (function (_super) {
         __extends(FlashObject, _super);
         function FlashObject() {
@@ -19,12 +13,21 @@ var fl;
         return FlashObject;
     }(PIXI.Container));
     fl.FlashObject = FlashObject;
-    var Animable = (function (_super) {
-        __extends(Animable, _super);
-        function Animable() {
+})(fl || (fl = {}));
+var fl;
+(function (fl) {
+    var FrameLabel = (function () {
+        function FrameLabel() {
+        }
+        return FrameLabel;
+    }());
+    fl.FrameLabel = FrameLabel;
+    var FrameObject = (function (_super) {
+        __extends(FrameObject, _super);
+        function FrameObject() {
             _super.apply(this, arguments);
         }
-        Animable.prototype.gotoLabel = function (label) {
+        FrameObject.prototype.gotoLabel = function (label) {
             var n = this.labels.length;
             for (var i = 0; i < n; i++) {
                 if (this.labels[i].name == label) {
@@ -34,51 +37,51 @@ var fl;
             }
             return false;
         };
-        Animable.prototype.stepForward = function () {
+        FrameObject.prototype.stepForward = function () {
             if (this.currentFrame + 1 < this.totalFrames)
                 this.currentFrame = this.currentFrame + 1;
             else
                 this.currentFrame = 0;
             return this;
         };
-        Animable.prototype.stepBackward = function () {
+        FrameObject.prototype.stepBackward = function () {
             if (this.currentFrame > 0)
                 this.currentFrame = this.currentFrame - 1;
             else
                 this.currentFrame = this.totalFrames - 1;
             return this;
         };
-        Animable.prototype.gotoNextFrame = function () {
+        FrameObject.prototype.gotoNextFrame = function () {
             if (this.currentFrame + 1 < this.totalFrames)
                 this.currentFrame = this.currentFrame + 1;
             return this;
         };
-        Animable.prototype.gotoPrevFrame = function () {
+        FrameObject.prototype.gotoPrevFrame = function () {
             if (this.currentFrame > 0)
                 this.currentFrame = this.currentFrame - 1;
             return this;
         };
-        Animable.prototype.gotoFirstFrame = function () {
+        FrameObject.prototype.gotoFirstFrame = function () {
             this.currentFrame = 0;
             return this;
         };
-        Animable.prototype.gotoLastFrame = function () {
+        FrameObject.prototype.gotoLastFrame = function () {
             this.currentFrame = this.totalFrames - 1;
             return this;
         };
-        Animable.prototype.gotoRandomFrame = function () {
+        FrameObject.prototype.gotoRandomFrame = function () {
             this.currentFrame = (Math.random() * this.totalFrames) | 0;
             return this;
         };
-        Animable.prototype.isFirstFrame = function () {
+        FrameObject.prototype.isFirstFrame = function () {
             return this.currentFrame == 0;
         };
-        Animable.prototype.isLastFrame = function () {
+        FrameObject.prototype.isLastFrame = function () {
             return this.currentFrame == this.totalFrames - 1;
         };
-        return Animable;
-    }(FlashObject));
-    fl.Animable = Animable;
+        return FrameObject;
+    }(fl.FlashObject));
+    fl.FrameObject = FrameObject;
 })(fl || (fl = {}));
 var fl;
 (function (fl) {
@@ -90,7 +93,7 @@ var fl;
         }
         Animation.prototype.playTo = function (endFrame) {
             this._looping = false;
-            this._endFrame = fl.clampRange(endFrame, 0, this._target.totalFrames - 1);
+            this._endFrame = fl.Internal.clampRange(endFrame, 0, this._target.totalFrames - 1);
             this._step = this._endFrame > this._target.currentFrame ? 1 : -1;
             this.isActive = true;
         };
@@ -143,15 +146,14 @@ var fl;
         Animation.prototype.gotoAndStop = function (frameNum) {
             this._target.currentFrame = frameNum;
             this.stop();
-            return this;
         };
         Animation.prototype.gotoAndPlay = function (frameNum) {
             this._target.currentFrame = frameNum;
             this.play();
-            return this;
         };
         Animation.prototype.onComplete = function (handler) {
             this._completeHandler = handler;
+            return this;
         };
         Animation.defaultTicksPerFrame = 1;
         return Animation;
@@ -173,6 +175,14 @@ var fl;
         Object.defineProperty(Resource.prototype, "id", {
             get: function () {
                 return this._id;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Resource.prototype, "name", {
+            get: function () {
+                var id = this._id;
+                return id.substr(id.lastIndexOf("/") + 1);
             },
             enumerable: true,
             configurable: true
@@ -359,7 +369,7 @@ var fl;
             this.labels = fl.Internal.EMPTY_ARRAY;
             this.color = new fl.Color(1, 1, 1, 1);
             this.isFlashObject = true;
-            this.isAnimable = false;
+            this.isFrameObject = false;
             this.scaleMultiplier = 1;
             this.globalColor = {};
         }
@@ -387,7 +397,7 @@ var fl;
             if (!this.visible)
                 return;
             var animable = this;
-            if (animable.isAnimable && animable.animation && animable.animation.isActive)
+            if (animable.isFlashObject && animable.animation && animable.animation.isActive)
                 animable.animation.update();
             this.updateColor();
             if (this.matrix) {
@@ -411,25 +421,21 @@ var fl;
             }
         };
         Container.prototype.updateColor = function () {
-            var c = this.color;
-            var r = c.r;
-            var g = c.g;
-            var b = c.b;
-            var a = c.a;
+            var lc = this.color;
             var gc = this.globalColor;
             var parentObject = this.parent;
             if (parentObject && parentObject.isFlashObject) {
                 var pc = parentObject.globalColor;
-                gc.r = r * pc.r;
-                gc.g = g * pc.g;
-                gc.b = b * pc.b;
-                gc.a = a * pc.a;
+                gc.r = lc.r * pc.r;
+                gc.g = lc.g * pc.g;
+                gc.b = lc.b * pc.b;
+                gc.a = lc.a * pc.a;
             }
             else {
-                gc.r = r;
-                gc.g = g;
-                gc.b = b;
-                gc.a = a;
+                gc.r = lc.r;
+                gc.g = lc.g;
+                gc.b = lc.b;
+                gc.a = lc.a;
             }
         };
         return Container;
@@ -448,7 +454,7 @@ var fl;
         __extends(Clip, _super);
         function Clip(resource) {
             _super.call(this);
-            this.isAnimable = true;
+            this.isFrameObject = true;
             this._currentFrame = 0;
             this._totalFrames = 1;
             this.nestedPlayingType = PlayType.LOOP;
@@ -468,7 +474,7 @@ var fl;
             get: function () { return this._currentFrame; },
             set: function (value) {
                 if (this._currentFrame != value) {
-                    this._currentFrame = fl.clampRange(value, 0, this._totalFrames - 1);
+                    this._currentFrame = fl.Internal.clampRange(value, 0, this._totalFrames - 1);
                     this.handleFrameChange();
                 }
             },
@@ -519,7 +525,7 @@ var fl;
                 var childProps = frame.instances[propsIndex];
                 if (child.timelineIndex == childProps.id) {
                     childProps.applyTo(child);
-                    if (child.isAnimable) {
+                    if (child.isFlashObject) {
                         var animable = child;
                         if (animable.totalFrames > 1) {
                             if (this.nestedPlayingType == PlayType.LOOP)
@@ -568,7 +574,7 @@ var fl;
         Clip.prototype.getTimeLineItem = function (instanceId) {
             var instance = this._instances[instanceId];
             instance.timelineIndex = instanceId;
-            if (instance.isAnimable)
+            if (instance.isFlashObject)
                 instance.currentFrame = 0;
             return instance;
         };
@@ -712,6 +718,7 @@ var fl;
     }());
     var ChildProps = (function () {
         function ChildProps() {
+            this.matrixChecked = false;
         }
         ChildProps.prototype.applyTo = function (target) {
             target.position.x = this.position.x;
@@ -723,6 +730,11 @@ var fl;
             target.color.g = this.color.g;
             target.color.b = this.color.b;
             target.color.a = this.color.a;
+            if (!this.matrixChecked) {
+                if (this.matrix && target.scaleMultiplier > 0 && target.scaleMultiplier != 1)
+                    this.matrix = null;
+                this.matrixChecked = true;
+            }
             target.matrix = this.matrix;
         };
         return ChildProps;
@@ -734,10 +746,10 @@ var fl;
         __extends(Sprite, _super);
         function Sprite(resource) {
             _super.call(this, null);
-            this.isFlashObject = true;
             this.timelineIndex = -1;
             this.color = new fl.Color(1, 1, 1, 1);
-            this.isAnimable = true;
+            this.isFlashObject = true;
+            this.isFrameObject = true;
             this.scaleMultiplier = 1;
             this._currentFrame = 0;
             this._totalFrames = 1;
@@ -773,7 +785,7 @@ var fl;
             get: function () { return this._currentFrame; },
             set: function (value) {
                 if (this._currentFrame != value) {
-                    this._currentFrame = fl.clampRange(value, 0, this._totalFrames - 1);
+                    this._currentFrame = fl.Internal.clampRange(value, 0, this._totalFrames - 1);
                     this.handleFrameChange();
                 }
             },
@@ -791,7 +803,7 @@ var fl;
         Sprite.prototype.updateTransform = function () {
             if (this._animation && this._animation.isActive)
                 this.animation.update();
-            this.updateColor();
+            fl.Internal.applyColor(this);
             if (this.matrix) {
                 var pt = this.parent.worldTransform;
                 var wt = this.worldTransform;
@@ -808,23 +820,6 @@ var fl;
             else {
                 _super.prototype.updateTransform.call(this);
             }
-        };
-        Sprite.prototype.updateColor = function () {
-            var c = this.color;
-            var r = c.r;
-            var g = c.g;
-            var b = c.b;
-            var a = c.a;
-            var parentObject = this.parent;
-            if (parentObject && parentObject.isFlashObject) {
-                var pc = parentObject.globalColor;
-                r *= pc.r;
-                g *= pc.g;
-                b *= pc.b;
-                a *= pc.a;
-            }
-            this.tint = 255 * r << 16 | 255 * g << 8 | 255 * b;
-            this.alpha = a;
         };
         Sprite.prototype.handleFrameChange = function () {
             var frame = this._resource.frames[this._currentFrame];
@@ -1023,14 +1018,14 @@ var fl;
         };
         Button.prototype.setDownState = function () {
             var states = this.content;
-            if (states.isAnimable) {
+            if (states.isFlashObject) {
                 states.currentFrame = 1;
                 states.updateTransform();
             }
         };
         Button.prototype.setUpState = function () {
             var states = this.content;
-            if (states.isAnimable) {
+            if (states.isFlashObject) {
                 states.currentFrame = 0;
                 states.updateTransform();
             }
@@ -1061,9 +1056,9 @@ var fl;
 var fl;
 (function (fl) {
     applyMixins(fl.Container, fl.FlashObject);
-    applyMixins(fl.Clip, fl.Animable);
+    applyMixins(fl.Clip, fl.FrameObject);
     applyMixins(fl.Sprite, fl.FlashObject);
-    applyMixins(fl.Sprite, fl.Animable);
+    applyMixins(fl.Sprite, fl.FrameObject);
     function applyMixins(derived, base) {
         Object.getOwnPropertyNames(base.prototype).forEach(function (name) {
             derived.prototype[name] = base.prototype[name];
@@ -1075,37 +1070,11 @@ var fl;
             throw new Error("Value not present: " + name);
     }
     fl.assertPresent = assertPresent;
-    function clampRange(value, min, max) {
-        if (value < min)
-            return min;
-        else if (value > max)
-            return max;
-        else
-            return value;
-    }
-    fl.clampRange = clampRange;
-    var Internal = (function () {
-        function Internal() {
-        }
-        Internal.dispatchLabels = function (target) {
-            if (!fl.onLabel)
-                return;
-            var n = target.labels.length;
-            var frame = target.currentFrame;
-            for (var i = 0; i < n; i++) {
-                if (target.labels[i].frame == frame)
-                    fl.onLabel(target, target.labels[i].name);
-            }
-        };
-        Internal.EMPTY_ARRAY = [];
-        return Internal;
-    }());
-    fl.Internal = Internal;
 })(fl || (fl = {}));
 var app;
 (function (app) {
     var AppScreen = (function () {
-        function AppScreen(name, content) {
+        function AppScreen(name) {
             this.name = "AppScreen";
             this._size = new PIXI.Point();
             this._anchors = [];
@@ -1113,7 +1082,11 @@ var app;
                 new app.RandomGroup(),
                 new app.AutoPlayAnim(),
             ];
+            this._keyActions = {};
             this.name = name;
+        }
+        AppScreen.prototype.createContent = function (path) {
+            var content = fl.Bundle.createClip(path);
             this.content = content;
             this._size.x = app.BASE_WIDTH;
             this._size.y = app.BASE_HEIGHT;
@@ -1122,10 +1095,10 @@ var app;
                 : 0;
             this.configureContent(content);
             this.configureAnchors();
-        }
+        };
         AppScreen.prototype.configureContent = function (content) {
             var _this = this;
-            content.children.forEach(function (it) {
+            content.forEachRecursive(function (it) {
                 if (_this.applyModifier(it))
                     return;
                 if (it instanceof fl.Clip)
@@ -1161,21 +1134,6 @@ var app;
             if (multiplier === void 0) { multiplier = 1.0; }
             this._anchors.push(new fl.Anchor(source, sourceProperty, target, targetProperty, multiplier));
         };
-        AppScreen.prototype.validateLayout = function () {
-            var scaleX = this.width / app.BASE_WIDTH;
-            var scaleY = this.height / app.BASE_HEIGHT;
-            var scale = Math.min(scaleX, scaleY);
-            this.content.scale.x = scale;
-            this.content.scale.y = scale;
-            this.content.x = 0.5 * (this.width - app.BASE_WIDTH * scale);
-            for (var _i = 0, _a = this._anchors; _i < _a.length; _i++) {
-                var a = _a[_i];
-                a.apply();
-            }
-            this.onLayoutChanged();
-        };
-        AppScreen.prototype.onLayoutChanged = function () { };
-        ;
         Object.defineProperty(AppScreen.prototype, "contentLeft", {
             get: function () {
                 var left = (-this.content.x) / this.content.scale.x;
@@ -1192,6 +1150,21 @@ var app;
             enumerable: true,
             configurable: true
         });
+        AppScreen.prototype.validateLayout = function () {
+            var scaleX = this.width / app.BASE_WIDTH;
+            var scaleY = this.height / app.BASE_HEIGHT;
+            var scale = Math.min(scaleX, scaleY);
+            this.content.scale.x = scale;
+            this.content.scale.y = scale;
+            this.content.x = 0.5 * (this.width - app.BASE_WIDTH * scale);
+            for (var _i = 0, _a = this._anchors; _i < _a.length; _i++) {
+                var a = _a[_i];
+                a.apply();
+            }
+            this.onLayoutChanged();
+        };
+        AppScreen.prototype.onLayoutChanged = function () { };
+        ;
         Object.defineProperty(AppScreen.prototype, "width", {
             get: function () {
                 return this._size.x;
@@ -1218,9 +1191,68 @@ var app;
             this._size.y = y;
             this.validateLayout();
         };
+        AppScreen.prototype.bindKey = function (keyCode, action) {
+            this._keyActions[keyCode] = action;
+        };
+        AppScreen.prototype.bindResource = function (namePrefix, action) {
+            this._modifiers.push(new app.ResourceModifier(namePrefix, action));
+        };
+        AppScreen.prototype.bindButtonRes = function (name, action) {
+            var buttonFactory = function (it) { return new fl.Button(it, action); };
+            this._modifiers.push(new app.ResourceModifier(name, buttonFactory));
+        };
+        AppScreen.prototype.handleKeyDown = function (e) {
+            var action = this._keyActions[e.keyCode];
+            if (action)
+                action();
+        };
+        AppScreen.prototype.getChild = function (path) {
+            var child = this.content.findByPath(path);
+            if (child == null)
+                throw new Error("Child not found: " + path);
+            return child;
+        };
         return AppScreen;
     }());
     app.AppScreen = AppScreen;
+})(app || (app = {}));
+var app;
+(function (app) {
+    var IntroScreen = (function (_super) {
+        __extends(IntroScreen, _super);
+        function IntroScreen() {
+            _super.call(this, 'IntroScreen');
+            this.bindKey(83, app.Nav.gotoMainMenu);
+            this.bindButtonRes("btn_skip_intro", app.Nav.gotoMainMenu);
+            this.createContent('intro/intro_screen');
+            this.content.animation
+                .onComplete(function () { return setTimeout(app.Nav.gotoMainMenu); })
+                .playFromBeginToEnd();
+        }
+        return IntroScreen;
+    }(app.AppScreen));
+    app.IntroScreen = IntroScreen;
+})(app || (app = {}));
+var app;
+(function (app) {
+    var MainMenuScreen = (function (_super) {
+        __extends(MainMenuScreen, _super);
+        function MainMenuScreen() {
+            var _this = this;
+            _super.call(this, "MainMenuScreen");
+            this.bindButtonRes("btn_play_again", app.Nav.gotoIntro);
+            this.bindResource("menu_point", function (it) { return _this.initMenuPoint(it); });
+            this.createContent("intro/menu_screen");
+        }
+        MainMenuScreen.prototype.initMenuPoint = function (obj) {
+            var pointName = obj.resource.name;
+            var pointNum = pointName.split("_").pop();
+            var contentId = "chapter_" + pointNum;
+            new fl.Button(obj, function () { return app.Nav.gotoContent(contentId); });
+        };
+        return MainMenuScreen;
+    }(app.AppScreen));
+    app.MainMenuScreen = MainMenuScreen;
 })(app || (app = {}));
 var app;
 (function (app) {
@@ -1231,9 +1263,8 @@ var app;
     function initialize() {
         App.initialize();
         document.body.querySelector("#app").appendChild(App.canvas);
-        window.onresize = function (event) {
-            App.isLayoutValid = false;
-        };
+        window.onresize = function () { return App.isLayoutValid = false; };
+        window.onkeydown = function (e) { return App.handleKeyDown(e); };
     }
     app.initialize = initialize;
     var App = (function () {
@@ -1243,6 +1274,7 @@ var app;
             App._fpsField = document.querySelector("#fps");
             fl.Animation.defaultTicksPerFrame = 2;
             fl.Bundle.version = new Date().getTime().toString();
+            fl.onFrameLabel = App.handleLabel;
             App.initStage();
             App.loadBundle();
             App.validateLayout();
@@ -1261,6 +1293,8 @@ var app;
         App.loadBundle = function () {
             if (app.startupMode == "test")
                 fl.Bundle.load('test', function () { return App.changeScreen(new app.TestScreen()); });
+            if (app.startupMode == "menu")
+                fl.Bundle.load('intro', function () { return App.changeScreen(new app.MainMenuScreen()); });
             else
                 fl.Bundle.load('intro', function () { return App.changeScreen(new app.IntroScreen()); });
         };
@@ -1287,6 +1321,20 @@ var app;
             if (App._screen)
                 App._screen.resize(App.renderer.width, App.renderer.height);
         };
+        App.handleLabel = function (sender, label) {
+            if (label.indexOf("goto_") == 0) {
+                var frame = Number(label.substr(5));
+                if (frame > 0)
+                    sender.currentFrame = frame - 1;
+            }
+            else if (label == "stop") {
+                sender.animation.stop();
+            }
+        };
+        App.handleKeyDown = function (e) {
+            if (App._screen)
+                App._screen.handleKeyDown(e);
+        };
         App.changeScreen = function (screen) {
             console.log("App.changeScreen: " + screen.name);
             if (App._screen)
@@ -1310,22 +1358,48 @@ var app;
 })(app || (app = {}));
 var app;
 (function (app) {
-    var IntroScreen = (function (_super) {
-        __extends(IntroScreen, _super);
-        function IntroScreen() {
-            _super.call(this, 'IntroScreen', fl.Bundle.createClip('intro/intro_screen'));
-            this.content.animation.play();
+    var ContentScreen = (function (_super) {
+        __extends(ContentScreen, _super);
+        function ContentScreen(contentId) {
+            var _this = this;
+            _super.call(this, "ContentScreen");
+            this.contentId = contentId;
+            this.bindButtonRes("btn_home", app.Nav.gotoMainMenu);
+            this.bindButtonRes("btn_sound", function (it) { return _this.onSoundClick(it); });
+            this.createContent("intro/content_common_page");
         }
-        return IntroScreen;
+        ContentScreen.prototype.onSoundClick = function (btn) {
+            btn.content.stepForward();
+        };
+        return ContentScreen;
     }(app.AppScreen));
-    app.IntroScreen = IntroScreen;
+    app.ContentScreen = ContentScreen;
+})(app || (app = {}));
+var app;
+(function (app) {
+    var Nav = (function () {
+        function Nav() {
+        }
+        Nav.gotoIntro = function () {
+            app.App.changeScreen(new app.IntroScreen());
+        };
+        Nav.gotoMainMenu = function () {
+            app.App.changeScreen(new app.MainMenuScreen());
+        };
+        Nav.gotoContent = function (contentId) {
+            app.App.changeScreen(new app.ContentScreen(contentId));
+        };
+        return Nav;
+    }());
+    app.Nav = Nav;
 })(app || (app = {}));
 var app;
 (function (app) {
     var TestScreen = (function (_super) {
         __extends(TestScreen, _super);
         function TestScreen() {
-            _super.call(this, 'TestScreen', fl.Bundle.createClip('test/skew_screen'));
+            _super.call(this, 'TestScreen');
+            this.createContent('test/skew_screen');
             this.content.animation.play();
         }
         return TestScreen;
@@ -1366,6 +1440,53 @@ var fl;
     }());
     fl.Color = Color;
 })(fl || (fl = {}));
+var fl;
+(function (fl) {
+    var Internal = (function () {
+        function Internal() {
+        }
+        Internal.dispatchLabels = function (target) {
+            if (!fl.onFrameLabel)
+                return;
+            var n = target.labels.length;
+            var frame = target.currentFrame;
+            for (var i = 0; i < n; i++) {
+                if (target.labels[i].frame == frame)
+                    fl.onFrameLabel(target, target.labels[i].name);
+            }
+        };
+        Internal.applyColor = function (target) {
+            var lc = target.color;
+            var parent = target.parent;
+            if (parent && parent.isFlashObject) {
+                var gc = parent.globalColor;
+                var r = lc.r * gc.r;
+                var g = lc.g * gc.g;
+                var b = lc.b * gc.b;
+                var a = lc.a * gc.a;
+            }
+            else {
+                var r = lc.r;
+                var g = lc.g;
+                var b = lc.b;
+                var a = lc.a;
+            }
+            target.tint = 255 * r << 16 | 255 * g << 8 | 255 * b;
+            target.alpha = a;
+        };
+        Internal.clampRange = function (value, min, max) {
+            if (value < min)
+                return min;
+            else if (value > max)
+                return max;
+            else
+                return value;
+        };
+        Internal.EMPTY_ARRAY = [];
+        return Internal;
+    }());
+    fl.Internal = Internal;
+})(fl || (fl = {}));
 var PIXI;
 (function (PIXI) {
     PIXI.DisplayObject.prototype.detach = function () {
@@ -1380,6 +1501,14 @@ var PIXI;
                 action(child);
             if (child instanceof PIXI.Container)
                 child.forEachRecursive(action);
+        }
+    };
+    PIXI.Container.prototype.forEachFrameObject = function (action) {
+        var n = this.children.length;
+        for (var i = 0; i < n; i++) {
+            var child = this.children[i];
+            if (child.isFrameObject)
+                action(child);
         }
     };
     PIXI.Container.prototype.findAll = function (predicate) {
@@ -1433,10 +1562,10 @@ var fl;
         __extends(Text, _super);
         function Text(text, style) {
             _super.call(this, text, style);
-            this.isFlashObject = true;
             this.timelineIndex = -1;
             this.color = new fl.Color(1, 1, 1, 1);
-            this.isAnimable = false;
+            this.isFlashObject = true;
+            this.isFrameObject = false;
             this.scaleMultiplier = 1;
         }
         Text.fromData = function (data) {
@@ -1489,6 +1618,10 @@ var fl;
             enumerable: true,
             configurable: true
         });
+        Text.prototype.updateTransform = function () {
+            fl.Internal.applyColor(this);
+            _super.prototype.updateTransform.call(this);
+        };
         return Text;
     }(PIXI.Text));
     fl.Text = Text;
@@ -1502,7 +1635,10 @@ var app;
             return app.StringUtil.startsWith(target.name, "autoPlay");
         };
         AutoPlayAnim.prototype.process = function (target) {
-            target.animation.play();
+            if (app.StringUtil.startsWith(target.name, "autoPlayOnce"))
+                target.animation.playFromBeginToEnd();
+            else
+                target.animation.play();
         };
         return AutoPlayAnim;
     }());
@@ -1515,7 +1651,7 @@ var app;
             this.groups = {};
         }
         RandomGroup.prototype.accepts = function (target) {
-            return target.isAnimable
+            return target.isFrameObject
                 && target.name
                 && target.name.split("_")[0] == "randomGroup";
         };
@@ -1552,6 +1688,25 @@ var app;
         };
         return Group;
     }());
+})(app || (app = {}));
+var app;
+(function (app) {
+    var ResourceModifier = (function () {
+        function ResourceModifier(prefix, action) {
+            this.prefix = prefix;
+            this.action = action;
+        }
+        ResourceModifier.prototype.accepts = function (target) {
+            return target.isFrameObject
+                && target.resource.name
+                && target.resource.name.indexOf(this.prefix) == 0;
+        };
+        ResourceModifier.prototype.process = function (target) {
+            this.action(target);
+        };
+        return ResourceModifier;
+    }());
+    app.ResourceModifier = ResourceModifier;
 })(app || (app = {}));
 var app;
 (function (app) {
