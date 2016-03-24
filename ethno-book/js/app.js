@@ -89,8 +89,94 @@ var fl;
         function Animation(target) {
             this.ticksPerFrame = Animation.defaultTicksPerFrame;
             this.isActive = false;
+            this._innerActive = true;
+            this._innerJump = undefined;
+            this._innerCond = undefined;
             this._target = target;
         }
+        Animation.prototype.parseCondition = function (raw) {
+            if (this._innerCond === undefined) {
+                this._innerCond = Number(raw);
+                if (isNaN(this._innerCond)) {
+                    this._innerCond = raw;
+                    Animation.signals[this._innerCond] = undefined;
+                }
+            }
+        };
+        Animation.prototype.parseJump = function (raw) {
+            this._innerJump = Number(raw) - 1;
+            if (isNaN(this._innerJump))
+                this._innerJump = raw;
+        };
+        Animation.prototype.applyControlLabel = function (label) {
+            if (label === "#stop") {
+                this._innerActive = false;
+                this.isActive = false;
+            }
+            else if (label.indexOf("#loop") == 0) {
+                var params = label.split("_");
+                this.parseJump(params[1]);
+                this.parseCondition(params[2]);
+            }
+            else if (label.indexOf("#wait") == 0) {
+                var params = label.split("_");
+                this._innerJump = this._target.currentFrame;
+                this.parseCondition(params[1]);
+            }
+            else if (label.indexOf("#send") == 0) {
+                var signal = label.split("_")[1];
+                Animation.signals[signal] = 1;
+            }
+        };
+        Animation.prototype.updateByParent = function () {
+            if (!this._innerActive)
+                return;
+            if (this._innerJump === undefined) {
+                this._target.stepForward();
+                return;
+            }
+            var isLoopExit = (this._innerCond == 0)
+                || Animation.signals[this._innerCond] == 1;
+            if (isLoopExit) {
+                this._target.stepForward();
+                this._innerCond = undefined;
+                this._innerJump = undefined;
+                return;
+            }
+            var isWaiting = this._innerJump === this._target.currentFrame;
+            if (!isWaiting) {
+                if (typeof (this._innerJump) == "string")
+                    this._target.gotoLabel(this._innerJump);
+                else
+                    this._target.currentFrame = this._innerJump;
+                this._innerJump = undefined;
+            }
+            if (this._innerCond > 0)
+                this._innerCond = this._innerCond - 1;
+        };
+        Animation.prototype.update = function () {
+            if (++this._tickCounter < this.ticksPerFrame)
+                return;
+            this._tickCounter = 0;
+            if (this._innerJump !== undefined) {
+                this.updateByParent();
+            }
+            else {
+                var currentFrame = this._target.currentFrame;
+                if (!this._looping && currentFrame == this._endFrame) {
+                    this.stop();
+                    if (this._completeHandler)
+                        this._completeHandler(this);
+                    return;
+                }
+                var nextFrame = currentFrame + this._step;
+                if (nextFrame < 0)
+                    nextFrame = this._target.totalFrames - 1;
+                else if (nextFrame >= this._target.totalFrames)
+                    nextFrame = 0;
+                this._target.currentFrame = nextFrame;
+            }
+        };
         Animation.prototype.playTo = function (endFrame) {
             this._looping = false;
             this._endFrame = fl.Internal.clampRange(endFrame, 0, this._target.totalFrames - 1);
@@ -104,24 +190,6 @@ var fl;
         };
         Animation.prototype.stop = function () {
             this.isActive = false;
-        };
-        Animation.prototype.update = function () {
-            if (++this._tickCounter < this.ticksPerFrame)
-                return;
-            this._tickCounter = 0;
-            var currentFrame = this._target.currentFrame;
-            if (!this._looping && currentFrame == this._endFrame) {
-                this.stop();
-                if (this._completeHandler)
-                    this._completeHandler(this);
-                return;
-            }
-            var nextFrame = currentFrame + this._step;
-            if (nextFrame < 0)
-                nextFrame = this._target.totalFrames - 1;
-            else if (nextFrame >= this._target.totalFrames)
-                nextFrame = 0;
-            this._target.currentFrame = nextFrame;
         };
         Animation.prototype.play = function () {
             this.playLoop(1);
@@ -156,6 +224,7 @@ var fl;
             return this;
         };
         Animation.defaultTicksPerFrame = 1;
+        Animation.signals = {};
         return Animation;
     }());
     fl.Animation = Animation;
@@ -444,12 +513,6 @@ var fl;
 })(fl || (fl = {}));
 var fl;
 (function (fl) {
-    (function (PlayType) {
-        PlayType[PlayType["LOOP"] = 0] = "LOOP";
-        PlayType[PlayType["ONCE"] = 1] = "ONCE";
-        PlayType[PlayType["NONE"] = 2] = "NONE";
-    })(fl.PlayType || (fl.PlayType = {}));
-    var PlayType = fl.PlayType;
     var Clip = (function (_super) {
         __extends(Clip, _super);
         function Clip(resource) {
@@ -457,7 +520,7 @@ var fl;
             this.isFrameObject = true;
             this._currentFrame = 0;
             this._totalFrames = 1;
-            this.nestedPlayingType = PlayType.LOOP;
+            this.autoPlayChildren = true;
             this._instances = [];
             this._resource = resource;
             this._totalFrames = resource.frames.length;
@@ -525,14 +588,10 @@ var fl;
                 var childProps = frame.instances[propsIndex];
                 if (child.timelineIndex == childProps.id) {
                     childProps.applyTo(child);
-                    if (child.isFlashObject) {
-                        var animable = child;
-                        if (animable.totalFrames > 1) {
-                            if (this.nestedPlayingType == PlayType.LOOP)
-                                animable.stepForward();
-                            else if (this.nestedPlayingType == PlayType.ONCE)
-                                animable.gotoNextFrame();
-                        }
+                    if (this.autoPlayChildren
+                        && child.isFrameObject
+                        && child.totalFrames > 1) {
+                        child.animation.updateByParent();
                     }
                     propsIndex++;
                     childIndex++;
@@ -574,8 +633,10 @@ var fl;
         Clip.prototype.getTimeLineItem = function (instanceId) {
             var instance = this._instances[instanceId];
             instance.timelineIndex = instanceId;
-            if (instance.isFlashObject)
-                instance.currentFrame = 0;
+            if (instance.isFrameObject) {
+                var frameObj = instance;
+                frameObj.currentFrame = 0;
+            }
             return instance;
         };
         Object.defineProperty(Clip.prototype, "resource", {
@@ -1078,6 +1139,7 @@ var app;
             this.name = "AppScreen";
             this._size = new PIXI.Point();
             this._anchors = [];
+            this._reserve = 256;
             this._modifiers = [
                 new app.RandomGroup(),
                 new app.AutoPlayAnim(),
@@ -1090,9 +1152,6 @@ var app;
             this.content = content;
             this._size.x = app.BASE_WIDTH;
             this._size.y = app.BASE_HEIGHT;
-            this._reserve = content.children.length > 0
-                ? Math.abs(content.getChildAt(0).x)
-                : 0;
             this.configureContent(content);
             this.configureAnchors();
         };
@@ -1121,8 +1180,8 @@ var app;
             var left = leftGuid ? leftGuid.x : Number.MIN_VALUE;
             var rightGuid = this.content.getChildByName("guid_right");
             var right = rightGuid ? rightGuid.x : Number.MAX_VALUE;
-            this.content.children.forEach(function (it) {
-                if (app.StringUtil.startsWith(it.name, "back"))
+            this.content.forEachFrameObject(function (it) {
+                if (!app.StringUtil.startsWith(it.name, "btn_") && !app.StringUtil.startsWith(it.resource.name, "btn_"))
                     return;
                 if (it.x <= left)
                     _this.addAnchor(_this, "contentLeft", it, "x");
@@ -1206,6 +1265,26 @@ var app;
             if (action)
                 action();
         };
+        AppScreen.prototype.createMusic = function (name) {
+            if (name === void 0) { name = null; }
+            this._musicName = name;
+            this.updateMusicState();
+        };
+        AppScreen.prototype.toggleSound = function () {
+            app.App.muted = !app.App.muted;
+            this.updateMusicState();
+        };
+        AppScreen.prototype.updateMusicState = function () {
+            if (app.App.muted) {
+                app.App.music.stopMusic();
+            }
+            else if (!this._musicName) {
+                app.App.music.stopMusic();
+            }
+            else if (this._musicName != app.App.music.currentMusicName) {
+                app.App.music.playMusic(this._musicName);
+            }
+        };
         AppScreen.prototype.getChild = function (path) {
             var child = this.content.findByPath(path);
             if (child == null)
@@ -1224,10 +1303,13 @@ var app;
             _super.call(this, 'IntroScreen');
             this.bindKey(83, app.Nav.gotoMainMenu);
             this.bindButtonRes("btn_skip_intro", app.Nav.gotoMainMenu);
+            this.bindResource("intro_anim", function (it) {
+                it.animation
+                    .onComplete(function () { return setTimeout(app.Nav.gotoMainMenu); })
+                    .playFromBeginToEnd();
+            });
             this.createContent('intro/intro_screen');
-            this.content.animation
-                .onComplete(function () { return setTimeout(app.Nav.gotoMainMenu); })
-                .playFromBeginToEnd();
+            this.createMusic("intro");
         }
         return IntroScreen;
     }(app.AppScreen));
@@ -1240,9 +1322,11 @@ var app;
         function MainMenuScreen() {
             var _this = this;
             _super.call(this, "MainMenuScreen");
+            this.bindButtonRes("btn_sound", function () { return _this.toggleSound(); });
             this.bindButtonRes("btn_play_again", app.Nav.gotoIntro);
             this.bindResource("menu_point", function (it) { return _this.initMenuPoint(it); });
             this.createContent("intro/menu_screen");
+            this.createMusic("menu");
         }
         MainMenuScreen.prototype.initMenuPoint = function (obj) {
             var pointName = obj.resource.name;
@@ -1278,6 +1362,7 @@ var app;
             App.initStage();
             App.loadBundle();
             App.validateLayout();
+            App.music = new app.AppMusic();
             requestAnimationFrame(App.animate);
         };
         App.initStage = function () {
@@ -1322,14 +1407,6 @@ var app;
                 App._screen.resize(App.renderer.width, App.renderer.height);
         };
         App.handleLabel = function (sender, label) {
-            if (label.indexOf("goto_") == 0) {
-                var frame = Number(label.substr(5));
-                if (frame > 0)
-                    sender.currentFrame = frame - 1;
-            }
-            else if (label == "stop") {
-                sender.animation.stop();
-            }
         };
         App.handleKeyDown = function (e) {
             if (App._screen)
@@ -1352,9 +1429,62 @@ var app;
             configurable: true
         });
         App.isLayoutValid = false;
+        App.muted = false;
         return App;
     }());
     app.App = App;
+})(app || (app = {}));
+var app;
+(function (app) {
+    var AppMusic = (function () {
+        function AppMusic() {
+            this._musicVol = AppMusic.defaultMusicVol;
+        }
+        AppMusic.prototype.playMusic = function (name) {
+            this.stopMusic();
+            var url = AppMusic.rootPath + "/" + name + "." + AppMusic.defaultExt;
+            this._currentMusic = new Howl({
+                urls: [url],
+                autoplay: true,
+                loop: true,
+                volume: this._musicVol,
+            });
+        };
+        AppMusic.prototype.stopMusic = function () {
+            if (!this._currentMusic)
+                return;
+            var current = this._currentMusic;
+            current.fade(current.volume(), 0, AppMusic.fadeDuration, function () { return current.unload(); });
+            this._currentMusic = null;
+        };
+        Object.defineProperty(AppMusic.prototype, "currentMusicName", {
+            get: function () {
+                return this._currentMusicName;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(AppMusic.prototype, "musicVol", {
+            get: function () {
+                return this._musicVol;
+            },
+            set: function (value) {
+                if (this._musicVol != value) {
+                    this._musicVol = value;
+                    if (this._currentMusic)
+                        this._currentMusic.volume(value);
+                }
+            },
+            enumerable: true,
+            configurable: true
+        });
+        AppMusic.rootPath = "assets/sounds";
+        AppMusic.defaultExt = "mp3";
+        AppMusic.defaultMusicVol = 0.5;
+        AppMusic.fadeDuration = 800;
+        return AppMusic;
+    }());
+    app.AppMusic = AppMusic;
 })(app || (app = {}));
 var app;
 (function (app) {
@@ -1365,12 +1495,9 @@ var app;
             _super.call(this, "ContentScreen");
             this.contentId = contentId;
             this.bindButtonRes("btn_home", app.Nav.gotoMainMenu);
-            this.bindButtonRes("btn_sound", function (it) { return _this.onSoundClick(it); });
+            this.bindButtonRes("btn_sound", function () { return _this.toggleSound(); });
             this.createContent("intro/content_common_page");
         }
-        ContentScreen.prototype.onSoundClick = function (btn) {
-            btn.content.stepForward();
-        };
         return ContentScreen;
     }(app.AppScreen));
     app.ContentScreen = ContentScreen;
@@ -1446,13 +1573,18 @@ var fl;
         function Internal() {
         }
         Internal.dispatchLabels = function (target) {
-            if (!fl.onFrameLabel)
-                return;
             var n = target.labels.length;
+            if (n == 0)
+                return;
             var frame = target.currentFrame;
             for (var i = 0; i < n; i++) {
-                if (target.labels[i].frame == frame)
-                    fl.onFrameLabel(target, target.labels[i].name);
+                if (target.labels[i].frame == frame) {
+                    var label = target.labels[i].name;
+                    if (label[0] == "#")
+                        target.animation.applyControlLabel(label);
+                    if (fl.onFrameLabel)
+                        fl.onFrameLabel(target, label);
+                }
             }
         };
         Internal.applyColor = function (target) {
